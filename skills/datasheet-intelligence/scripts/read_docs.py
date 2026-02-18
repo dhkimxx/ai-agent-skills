@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--knowledge-dir",
         default=".context/knowledge",
-        help="Knowledge directory produced by ingest_tech_docs.py.",
+        help="Knowledge directory produced by ingest_docs.py.",
     )
     parser.add_argument(
         "--anchor",

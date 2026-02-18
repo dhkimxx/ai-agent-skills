@@ -1,6 +1,7 @@
 # Output Contract
 
 Use this schema when consuming generated artifacts from `.context/knowledge`.
+For CLI runtime flags and presets, see `references/execution-options.md`.
 
 ## Files Per Datasheet
 
@@ -30,5 +31,5 @@ Use this schema when consuming generated artifacts from `.context/knowledge`.
 ## Retrieval Pattern
 
 1. Search `.sections.jsonl` using `scripts/search_docs.py`.
-2. Open matching markdown via `scripts/read_spec.py`.
+2. Open matching markdown via `scripts/read_docs.py`.
 3. Resolve details from `.tables.md` when tabular values conflict with prose.

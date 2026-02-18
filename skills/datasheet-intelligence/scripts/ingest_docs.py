@@ -513,6 +513,48 @@ def count_markdown_tables(markdown: str) -> int:
     return len(TABLE_BLOCK_RE.findall(markdown))
 
 
+def build_output_files(doc_id: str, output_dir: Path) -> dict[str, str]:
+    return {
+        "markdown": str(output_dir / f"{doc_id}.md"),
+        "sections_jsonl": str(output_dir / f"{doc_id}.sections.jsonl"),
+        "tables_markdown": str(output_dir / f"{doc_id}.tables.md"),
+        "meta_json": str(output_dir / f"{doc_id}.meta.json"),
+        "docling_json": str(output_dir / f"{doc_id}.docling.json"),
+    }
+
+
+def build_meta(
+    doc_id: str,
+    source_path: Path,
+    output_files: dict[str, str],
+    status: str,
+    errors: list[str],
+    sections: int = 0,
+    chunks: int = 0,
+    images: int = 0,
+    tables_detected: int = 0,
+    tables_rendered: int = 0,
+    table_blocks_in_markdown: int = 0,
+    warnings: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "doc_id": doc_id,
+        "source_file": str(source_path),
+        "input_format": str(resolve_format(source_path)),
+        "status": status,
+        "errors": errors,
+        "generated_at_utc": now_utc_iso(),
+        "output_files": output_files,
+        "sections": sections,
+        "chunks": chunks,
+        "images": images,
+        "tables_detected": tables_detected,
+        "tables_rendered": tables_rendered,
+        "table_blocks_in_markdown": table_blocks_in_markdown,
+        "warnings": warnings or [],
+    }
+
+
 def process_document(
     source_path: Path,
     doc_id: str,
@@ -526,35 +568,21 @@ def process_document(
     status_obj = getattr(result, "status", ConversionStatus.FAILURE)
     status_value = status_obj.value if hasattr(status_obj, "value") else str(status_obj)
 
-    output_files = {
-        "markdown": str(output_dir / f"{doc_id}.md"),
-        "sections_jsonl": str(output_dir / f"{doc_id}.sections.jsonl"),
-        "tables_markdown": str(output_dir / f"{doc_id}.tables.md"),
-        "meta_json": str(output_dir / f"{doc_id}.meta.json"),
-        "docling_json": str(output_dir / f"{doc_id}.docling.json"),
-    }
+    output_files = build_output_files(doc_id=doc_id, output_dir=output_dir)
 
     doc = getattr(result, "document", None)
     if doc is None or status_obj not in {
         ConversionStatus.SUCCESS,
         ConversionStatus.PARTIAL_SUCCESS,
     }:
-        meta = {
-            "doc_id": doc_id,
-            "source_file": str(source_path),
-            "input_format": str(resolve_format(source_path)),
-            "status": status_value,
-            "errors": [str(err) for err in getattr(result, "errors", [])],
-            "generated_at_utc": now_utc_iso(),
-            "output_files": output_files,
-            "sections": 0,
-            "chunks": 0,
-            "images": 0,
-            "tables_detected": 0,
-            "tables_rendered": 0,
-            "table_blocks_in_markdown": 0,
-            "warnings": ["Conversion failed or returned no datasheet content."],
-        }
+        meta = build_meta(
+            doc_id=doc_id,
+            source_path=source_path,
+            output_files=output_files,
+            status=status_value,
+            errors=[str(err) for err in getattr(result, "errors", [])],
+            warnings=["Conversion failed or returned no datasheet content."],
+        )
         Path(output_files["meta_json"]).write_text(
             json.dumps(meta, ensure_ascii=False, indent=2),
             encoding="utf-8",
@@ -611,22 +639,20 @@ def process_document(
             "use .tables.md when table fidelity is critical."
         )
 
-    meta = {
-        "doc_id": doc_id,
-        "source_file": str(source_path),
-        "input_format": str(resolve_format(source_path)),
-        "status": status_value,
-        "errors": [str(err) for err in getattr(result, "errors", [])],
-        "generated_at_utc": now_utc_iso(),
-        "output_files": output_files,
-        "sections": len(sections),
-        "chunks": len(section_rows),
-        "images": len(images),
-        "tables_detected": tables_detected,
-        "tables_rendered": tables_rendered,
-        "table_blocks_in_markdown": markdown_table_blocks,
-        "warnings": warnings,
-    }
+    meta = build_meta(
+        doc_id=doc_id,
+        source_path=source_path,
+        output_files=output_files,
+        status=status_value,
+        errors=[str(err) for err in getattr(result, "errors", [])],
+        sections=len(sections),
+        chunks=len(section_rows),
+        images=len(images),
+        tables_detected=tables_detected,
+        tables_rendered=tables_rendered,
+        table_blocks_in_markdown=markdown_table_blocks,
+        warnings=warnings,
+    )
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     return meta
 
@@ -731,15 +757,33 @@ def main() -> int:
         if args.verbose:
             print(f"[ingest] {source_path} -> {doc_id}")
 
-        meta = process_document(
-            source_path=source_path,
-            doc_id=doc_id,
-            converter=converter,
-            output_dir=output_dir,
-            max_chars=args.chunk_max_chars,
-            overlap=args.chunk_overlap,
-            no_images=args.no_images,
-        )
+        try:
+            meta = process_document(
+                source_path=source_path,
+                doc_id=doc_id,
+                converter=converter,
+                output_dir=output_dir,
+                max_chars=args.chunk_max_chars,
+                overlap=args.chunk_overlap,
+                no_images=args.no_images,
+            )
+        except Exception as exc:  # noqa: BLE001
+            output_files = build_output_files(doc_id=doc_id, output_dir=output_dir)
+            meta = build_meta(
+                doc_id=doc_id,
+                source_path=source_path,
+                output_files=output_files,
+                status="UNEXPECTED_ERROR",
+                errors=[str(exc)],
+                warnings=["Unhandled exception occurred while processing this document."],
+            )
+            Path(output_files["meta_json"]).write_text(
+                json.dumps(meta, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            if args.verbose:
+                print(f"[ingest-error] {source_path}: {exc}", file=sys.stderr)
+
         metas.append(meta)
         print(f"{doc_id}: {meta['status']}")
 

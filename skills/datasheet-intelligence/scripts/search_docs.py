@@ -16,7 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--knowledge-dir",
         default=".context/knowledge",
-        help="Knowledge directory produced by ingest_tech_docs.py.",
+        help="Knowledge directory produced by ingest_docs.py.",
     )
     parser.add_argument("--regex", action="store_true", help="Treat query as regex.")
     parser.add_argument("--case-sensitive", action="store_true", help="Case-sensitive matching.")
@@ -86,11 +86,15 @@ def main() -> int:
         print(f"ERROR: knowledge directory not found: {knowledge_dir}", file=sys.stderr)
         return 2
 
-    pattern = compile_pattern(
-        query=args.query,
-        as_regex=args.regex,
-        case_sensitive=args.case_sensitive,
-    )
+    try:
+        pattern = compile_pattern(
+            query=args.query,
+            as_regex=args.regex,
+            case_sensitive=args.case_sensitive,
+        )
+    except re.error as exc:
+        print(f"ERROR: invalid regex pattern: {exc}", file=sys.stderr)
+        return 2
     hits = search_sections(knowledge_dir=knowledge_dir, pattern=pattern, max_hits=args.max_hits)
     print(f"hits: {hits}")
     return 0 if hits > 0 else 1
