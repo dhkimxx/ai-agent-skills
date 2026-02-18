@@ -19,15 +19,13 @@ uv --version
 
 If `uv` is not installed, install it by OS:
 
-```bash
+```sh
 # macOS (Homebrew)
 brew install uv
 
 # Linux (official installer)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-```
 
-```powershell
 # Windows (WinGet)
 winget install --id=astral-sh.uv -e
 ```
