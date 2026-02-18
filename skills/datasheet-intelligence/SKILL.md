@@ -1,85 +1,136 @@
 ---
 name: datasheet-intelligence
-description: Prioritize this skill for any hardware task that requires datasheet-grounded facts or code (register addresses, bit fields, init sequences, timing/pin constraints). Ingest mixed-format sources (PDF, DOCX, HTML, Markdown, XLSX/CSV) with scripts/ingest_docs.py, then answer from .context/knowledge artifacts. Use this even when the user asks directly for code generation from datasheets; avoid ad-hoc source parsers (pdftotext, docx2txt, xlsx2csv, etc.) unless ingestion is blocked or fails.
+description: Use this skill whenever a request needs datasheet-grounded hardware facts or code generation (register address, bit field, reset value, pin mux, timing, init sequence). Trigger for prompts like "write C init code from datasheet", "verify register settings", or "find base address/bit definitions".
 ---
 
 # Datasheet Intelligence
 
 ## Purpose
 
-Ingest multi-format datasheets into a single Markdown-first knowledge base so agents can answer hardware questions using consistent structure.
+Help the agent read datasheets efficiently and produce evidence-grounded answers.
+
+- `PDF`: use TOC + targeted page reads.
+- `DOCX/XLSX`: search first, then read only relevant parts.
+- `--structured`: use Docling when table/header fidelity is required.
 
 ## Prerequisites
 
-This skill requires `uv` for dependency management and optionally `tesseract` for OCR.
+Use `uv` with this skill's `pyproject.toml` and `uv.lock`.
+Do not rely on PEP 723 inline script metadata.
 
-1. **Check `uv`**: Run `uv --version`.
-2. **Check Dependencies**: Run `uv run python3 scripts/check_deps.py` (checks docling, pdfium, and tesseract).
+```bash
+# Install uv if needed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-> [!NOTE]
-> If `uv` or `tesseract` are missing, see [installation.md](references/installation.md). Tesseract is optional but recommended for scanned PDFs.
+Use one of these execution contexts:
 
-Scripts in this skill use **PEP 723 inline metadata**. `uv run` will automatically install all required dependencies (docling, pypdfium2, etc.) in an ephemeral environment.
+- Recommended (works from any directory): `uv run --project skills/datasheet-intelligence ...`
+- Alternative: `cd skills/datasheet-intelligence && uv run ...`
+
+All command examples below use the recommended `--project` style.
 
 ## Workflow
 
-1. If required docs are already ingested in `.context/knowledge/`, skip re-ingest.
-2. If docs are missing, run `scripts/check_deps.py` then `scripts/ingest_docs.py`.
-3. Read outputs from `.context/knowledge/`. See [output-contract.md](references/output-contract.md) for the file structure.
-4. Use `scripts/search_docs.py` and `scripts/read_docs.py` to find and read specific sections.
-5. Draft the final answer citing specific `doc_id` and sections.
+### PDF Datasheets
+
+Choose the strategy by document size.
+
+#### Small (< 50 pages)
+
+1. Run `scripts/toc.py` (use `--structured` if bookmarks are missing).
+2. Run `scripts/read.py --pages` for relevant sections.
+3. Add `--structured` if tables are broken.
+
+#### Medium (50-150 pages)
+
+1. Run `scripts/toc.py --filter` to narrow sections.
+2. Run `scripts/search.py` to locate exact pages.
+3. Run `scripts/read.py --pages` for focused ranges (use `--structured` for table-heavy ranges).
+
+#### Large (>= 150 pages)
+
+Never read the whole document at once.
+
+1. Run `scripts/toc.py` to map sections and page ranges.
+2. Skip low-value sections (Legal, Revision History, Ordering Info, Package Drawing).
+3. Run `scripts/search.py` for exact keyword locations.
+4. Run `scripts/read.py --pages` in 10-30 page chunks.
+5. Iterate: read -> discover new keywords -> search again -> read again.
+
+High-priority large-PDF sections:
+
+| Priority | Section | Why |
+| --- | --- | --- |
+| High | Register Map / List | Addresses, bit fields, reset values |
+| High | Address Map | Base addresses, memory map |
+| Medium | Pin Description / GPIO | Pin functions, function select |
+| Medium | Electrical Characteristics | Voltage/current constraints |
+| Medium | Clock / Timing | Timing formulas, divider rules |
+| Low | Reset Controller | Reset release sequence |
+| Lowest | Legal / Ordering / Revision | Usually not needed |
+
+### DOCX / XLSX
+
+1. Run `scripts/search.py` first to find candidate paragraphs/rows.
+2. Run `scripts/read.py` for targeted reading.
+3. Use `scripts/read.py --structured` when layout/table structure is critical.
+4. If no hits, expand keywords and retry search before full reading.
 
 ## Commands
 
+Use `--structured` with `uv run --project ... --with docling`.
+
 ```bash
-# Check runtime dependencies
-uv run python3 scripts/check_deps.py
+SKILL_DIR="skills/datasheet-intelligence"
 
-# Ingest all supported datasheets (Standard)
-uv run python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
+# TOC
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/toc.py" docs/rp2040.pdf
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/toc.py" docs/rp2040.pdf --filter "I2C,GPIO,RESET"
+uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/toc.py" docs/spec.docx --structured
 
-# Ingest large files quickly (No OCR, No Tables, No Images) - Recommended for >100 pages
-uv run python3 scripts/ingest_docs.py docs/datasheets --fast
+# Read
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/read.py" docs/spec.docx
+uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470 --structured
+uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/spec.docx --structured
 
-# Ingest only top-level files without OCR
-uv run python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
+# Search
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE"
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/spec.docx "I2C0" "clock divider"
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/pinout.xlsx "GPIO" "FUNCSEL"
+uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" --structured
 
-# If PDF conversion is unstable, switch backend explicitly
-uv run python3 scripts/ingest_docs.py docs/datasheets --pdf-backend pypdfium2
-
-# Debug mode (traceback + debug logs)
-uv run python3 scripts/ingest_docs.py docs/datasheets --debug -v
-
-# Search and focused read
-uv run python3 scripts/search_docs.py "SPI0 address" --knowledge-dir .context/knowledge
-uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
+# Regex search
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_\\w+" --regex --max-hits 10
 ```
 
 ## Operational Rules
 
-- Use command-first guidance (above) instead of low-level converter internals.
-- Prefer `uv run` commands and do not assume a global `python` alias.
-- For datasheet-grounded tasks, this skill has higher priority than generic text extraction flows.
-- Keep output location at `.context/knowledge` unless user asks otherwise.
-- Preserve image presence in markdown with `![image_ref](path)` entries.
-- Keep section anchors and normalize textual references like `See Table 4.2` into markdown links when anchor targets exist.
-- Run on all provided files and summarize failures without stopping the whole batch unless explicitly requested.
-- Run `scripts/check_deps.py` before large ingestion batches to surface environment issues early.
-- Do not parse source files directly with ad-hoc tools (`pdftotext`, `pdfplumber`, `docx2txt`, `antiword`, `xlsx2csv`, `pandoc`, custom regex scraping) before trying `scripts/ingest_docs.py`.
-- For Word/Excel/PDF inputs, treat `scripts/ingest_docs.py` as the default and only extraction path.
-- Use `--debug` when failures are opaque and keep traceback logs with each failed `<doc>.meta.json`.
-- If ingestion fails for specific PDF files, check each `<doc>.meta.json` first, then retry deterministically with `--no-ocr` or `--pdf-backend pypdfium2` before proposing non-skill parsers.
-- `scripts/ingest_docs.py` automatically retries failed PDF documents once with OCR disabled unless `--no-retry-no-ocr` is set.
-- If both retries fail, report the concrete error from `.meta.json` and request approval before using any fallback parser.
-- For generated code or factual claims, cite the source from `.context/knowledge` (document + anchor/section; include table source when register values come from tables).
-- For detailed CLI options and execution presets, read `references/execution-options.md`.
-- If `uv` is unavailable, follow the fallback instructions in `references/execution-options.md`.
+- Start with TOC for PDF workflows.
+- Do selective reading for large documents.
+- Use search-first flow for DOCX/XLSX.
+- Use `--structured` for register/electrical/timing tables when fidelity matters.
+- Keep explicit project context in every command (`uv run --project ...`).
+- Read enough neighboring context to avoid missing table headers/footnotes.
+- Cross-check register values against Address Map / Register List sections.
+- Use iterative exploration (read -> search -> read).
+
+## Output Contract
+
+For datasheet-grounded answers or code:
+
+- Provide evidence for each critical claim (address, bit position, reset value, formula): `source file + page/section`.
+- Map important code settings to their evidence locations.
+- Do not guess unverifiable values; mark them as unverified.
+- If table/prose conflicts exist, report the conflict and separate uncertain items.
 
 ## Resources
 
-- `scripts/ingest_docs.py`: main ingestion pipeline
-- `scripts/check_deps.py`: preflight dependency checks
-- `scripts/search_docs.py`: chunk-level search helper
-- `scripts/read_docs.py`: focused reader helper
-- `references/output-contract.md`: output schema and retrieval contract
-- `references/execution-options.md`: detailed runtime flags and command presets
+| Script | Role | Formats | `--structured` |
+| --- | --- | --- | --- |
+| `scripts/toc.py` | TOC extraction | PDF, DOCX | Yes |
+| `scripts/read.py` | Targeted reading | PDF, DOCX, XLSX | Yes |
+| `scripts/search.py` | Keyword search | PDF, DOCX, XLSX | Yes |
+
+See [usage.md](references/usage.md) for detailed examples.

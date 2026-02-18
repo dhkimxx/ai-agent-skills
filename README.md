@@ -1,34 +1,33 @@
 # AI Agent Skills
 
-Codex, Claude, Antigravity에서 공통으로 사용할 수 있는 vendor-neutral skill repository입니다.
+Vendor-neutral skill repository for Codex, Claude, and Antigravity.
 
-## Skills 목록
+## Skills
 
-| 스킬 이름 |  설치 명령어 |
-| --- |  --- |
-| `datasheet-intelligence` | `npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence` |
-
+| Skill Name | Path | Install Command |
+| --- | --- | --- |
+| `datasheet-intelligence` | `skills/datasheet-intelligence` | `npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence` |
 
 ## `skills.sh` Installation Guide (`npx skills`)
 
 ```bash
-# GitHub owner/repo 방식
+# GitHub owner/repo format
 npx skills add dhkimxx/ai-agent-skills --skill $SKILL_NAME
 
-# GitHub URL 방식
+# GitHub URL format
 npx skills add https://github.com/dhkimxx/ai-agent-skills --skill $SKILL_NAME
 
-# global 설치
+# Global installation
 npx skills add dhkimxx/ai-agent-skills --skill $SKILL_NAME -g
 ```
 
-이 repository 기준 기본 예시:
+Default example for this repository:
 
 ```bash
 npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence
 ```
 
-`npx skills` 기본 명령:
+Common `npx skills` commands:
 
 ```bash
 npx skills --help
