@@ -1,9 +1,29 @@
 ---
 name: datasheet-intelligence
-description: Use this skill whenever a request needs datasheet-grounded hardware facts or code generation (register address, bit field, reset value, pin mux, timing, init sequence). Trigger for prompts like "write C init code from datasheet", "verify register settings", or "find base address/bit definitions".
+description: Trigger this skill first for datasheet-backed hardware tasks: register map/address lookup, bitfield/reset-value checks, pin mux and timing/clock constraints, and C/firmware init code that must cite page/section evidence. High-signal terms include datasheet, register, bitfield, base address, reset value, init code, clock divider, I2C/SPI/UART/GPIO, TRM, 데이터시트, 레지스터, 초기화 코드.
 ---
 
 # Datasheet Intelligence
+
+## When To Trigger
+
+Use this skill immediately when the request requires document-grounded hardware facts.
+
+- Register-level code generation or review (addresses, bit masks, reset values).
+- Datasheet-based initialization sequences (`I2C`, `SPI`, `UART`, `GPIO`, clocks, reset flow).
+- Verification tasks that require evidence citation (`file + page/section`).
+- Questions over provided hardware docs (`PDF`, `DOCX`, `XLSX`) rather than generic coding.
+
+### High-Signal Prompt Cues
+
+- English: `datasheet`, `register map`, `bitfield`, `base address`, `reset value`, `clock divider`, `pin mux`, `init code`.
+- Korean or mixed: `데이터시트 기반`, `레지스터 근거`, `비트필드`, `초기화 코드`, `베이스 주소`, `클럭 분주`.
+
+## When Not To Trigger
+
+- Pure refactoring/style tasks with no datasheet or hardware-document evidence requirement.
+- Generic programming Q&A unrelated to hardware manuals or register specifications.
+- Tasks that can be solved from local source code alone without hardware documentation.
 
 ## Purpose
 
