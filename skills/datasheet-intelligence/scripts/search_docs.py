@@ -37,7 +37,7 @@ def search_sections(
     max_hits: int,
 ) -> int:
     hits = 0
-    section_files = sorted(knowledge_dir.glob("*.sections.jsonl"))
+    section_files = sorted(knowledge_dir.rglob("*.sections.jsonl"))
     for path in section_files:
         with path.open("r", encoding="utf-8") as handle:
             for line_no, line in enumerate(handle, start=1):

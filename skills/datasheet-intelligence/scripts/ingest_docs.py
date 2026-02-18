@@ -179,8 +179,8 @@ def get_page_no(item: Any) -> int | None:
     return page_no if page_no > 0 else None
 
 
-def export_images(doc: Any, doc_id: str, output_dir: Path) -> list[dict[str, Any]]:
-    image_dir = output_dir / "_images" / doc_id
+def export_images(doc: Any, doc_id: str, doc_output_dir: Path) -> list[dict[str, Any]]:
+    image_dir = doc_output_dir / "_images"
     image_dir.mkdir(parents=True, exist_ok=True)
 
     images: list[dict[str, Any]] = []
@@ -202,7 +202,7 @@ def export_images(doc: Any, doc_id: str, output_dir: Path) -> list[dict[str, Any
         if not alt_text:
             alt_text = f"{doc_id} image {image_index}"
 
-        relative_path = image_path.relative_to(output_dir).as_posix()
+        relative_path = image_path.relative_to(doc_output_dir).as_posix()
         images.append(
             {
                 "index": image_index,
@@ -215,7 +215,6 @@ def export_images(doc: Any, doc_id: str, output_dir: Path) -> list[dict[str, Any
     if not images:
         try:
             image_dir.rmdir()
-            image_dir.parent.rmdir()
         except OSError:
             pass
 
@@ -513,13 +512,19 @@ def count_markdown_tables(markdown: str) -> int:
     return len(TABLE_BLOCK_RE.findall(markdown))
 
 
+def build_doc_output_dir(doc_id: str, output_dir: Path) -> Path:
+    return output_dir / doc_id
+
+
 def build_output_files(doc_id: str, output_dir: Path) -> dict[str, str]:
+    doc_output_dir = build_doc_output_dir(doc_id=doc_id, output_dir=output_dir)
+    doc_output_dir.mkdir(parents=True, exist_ok=True)
     return {
-        "markdown": str(output_dir / f"{doc_id}.md"),
-        "sections_jsonl": str(output_dir / f"{doc_id}.sections.jsonl"),
-        "tables_markdown": str(output_dir / f"{doc_id}.tables.md"),
-        "meta_json": str(output_dir / f"{doc_id}.meta.json"),
-        "docling_json": str(output_dir / f"{doc_id}.docling.json"),
+        "markdown": str(doc_output_dir / f"{doc_id}.md"),
+        "sections_jsonl": str(doc_output_dir / f"{doc_id}.sections.jsonl"),
+        "tables_markdown": str(doc_output_dir / f"{doc_id}.tables.md"),
+        "meta_json": str(doc_output_dir / f"{doc_id}.meta.json"),
+        "docling_json": str(doc_output_dir / f"{doc_id}.docling.json"),
     }
 
 
@@ -597,7 +602,8 @@ def process_document(
 
     images: list[dict[str, Any]] = []
     if not no_images:
-        images = export_images(doc=doc, doc_id=doc_id, output_dir=output_dir)
+        doc_output_dir = Path(output_files["markdown"]).parent
+        images = export_images(doc=doc, doc_id=doc_id, doc_output_dir=doc_output_dir)
 
     markdown_with_images = replace_image_placeholders(raw_markdown, images)
     markdown_with_anchors, ref_targets = annotate_headings(markdown_with_images)

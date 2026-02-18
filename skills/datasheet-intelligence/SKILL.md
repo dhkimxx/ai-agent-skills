@@ -37,11 +37,12 @@ After installation, restart the shell and verify `uv --version` again.
 1. Place source datasheets in a folder (for example `docs/datasheets/`).
 2. Run `scripts/ingest_docs.py` with `uv run --with docling python3`.
 3. Read outputs from `.context/knowledge/`:
-   - `<doc>.md`: normalized markdown
-   - `<doc>.sections.jsonl`: section chunks for retrieval
-   - `<doc>.tables.md`: table-focused markdown
-   - `<doc>.meta.json`: conversion metadata and validation info
-   - `<doc>.docling.json`: raw Docling structured export
+   - `<doc>/<doc>.md`: normalized markdown
+   - `<doc>/<doc>.sections.jsonl`: section chunks for retrieval
+   - `<doc>/<doc>.tables.md`: table-focused markdown
+   - `<doc>/<doc>.meta.json`: conversion metadata and validation info
+   - `<doc>/<doc>.docling.json`: raw Docling structured export
+   - `<doc>/_images/*`: extracted images
    - `knowledge.index.json`: corpus manifest
 4. Use search/read helpers:
    - `scripts/search_docs.py` for corpus search

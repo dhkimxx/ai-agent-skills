@@ -179,5 +179,6 @@ uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2 --max-lin
 ## Recommended Defaults
 
 - Keep `--output-dir .context/knowledge` for consistent downstream discovery.
+- Generated artifacts are grouped per document under `.context/knowledge/<doc_id>/`.
 - Start with default chunk settings unless retrieval quality is clearly poor.
 - Use `--fail-on-error` in CI; skip it for exploratory local batch runs.

@@ -41,13 +41,25 @@ def resolve_doc_path(doc_arg: str, knowledge_dir: Path) -> Path:
         return candidate.resolve()
 
     if candidate.suffix.lower() == ".md":
-        name = candidate.name
+        direct_path = (knowledge_dir / candidate).resolve()
+        if direct_path.exists():
+            return direct_path
+        doc_id = candidate.stem
     else:
-        name = f"{doc_arg}.md"
-    path = knowledge_dir / name
-    if not path.exists():
-        raise FileNotFoundError(f"Spec markdown not found: {path}")
-    return path.resolve()
+        doc_id = doc_arg
+
+    structured_path = (knowledge_dir / doc_id / f"{doc_id}.md").resolve()
+    if structured_path.exists():
+        return structured_path
+
+    legacy_path = (knowledge_dir / f"{doc_id}.md").resolve()
+    if legacy_path.exists():
+        return legacy_path
+
+    raise FileNotFoundError(
+        f"Spec markdown not found for doc '{doc_arg}'. "
+        f"Tried: {structured_path}, {legacy_path}"
+    )
 
 
 def find_anchor_range(lines: list[str], anchor: str) -> tuple[int, int]:
