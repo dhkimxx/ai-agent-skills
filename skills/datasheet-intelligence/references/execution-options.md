@@ -30,19 +30,6 @@ uv run python3 scripts/search_docs.py "I2C0 clock divider" --knowledge-dir .cont
 uv run python3 scripts/read_docs.py rp2040 --anchor i2c-controller --max-lines 200
 ```
 
-## Repository Hygiene
-
-Before running ingestion in a new repo, ignore generated knowledge artifacts:
-
-```bash
-if [ -f .gitignore ] && grep -qE '^\.context(/|$)' .gitignore; then
-  echo ".context ignore rule already exists"
-else
-  echo ".context/knowledge/" >> .gitignore
-fi
-```
-
-If you want broader ignore coverage for skill outputs, prefer `.context/`.
 
 ## Prerequisites
 

@@ -61,7 +61,6 @@ uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
 - Prefer `uv run` commands and do not assume a global `python` alias.
 - For datasheet-grounded tasks, this skill has higher priority than generic text extraction flows.
 - Keep output location at `.context/knowledge` unless user asks otherwise.
-- Before the first run, ensure generated artifacts are ignored by git (`.context/` or `.context/knowledge/` in `.gitignore`).
 - Preserve image presence in markdown with `![image_ref](path)` entries.
 - Keep section anchors and normalize textual references like `See Table 4.2` into markdown links when anchor targets exist.
 - Run on all provided files and summarize failures without stopping the whole batch unless explicitly requested.
