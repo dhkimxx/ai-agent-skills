@@ -11,6 +11,27 @@ import sys
 from pathlib import Path
 
 
+def print_search_fallback_hint(file_path: Path, filters: list[str] | None) -> None:
+    """북마크가 없는 PDF에서 search-first 폴백 명령을 안내한다."""
+    query_tokens = [k for k in (filters or []) if k]
+    if query_tokens:
+        query_args = " ".join(f'"{token}"' for token in query_tokens)
+    else:
+        # 사용자가 직접 도메인 키워드를 넣도록 템플릿 형태로 안내한다.
+        query_args = '"<keyword1>" "<keyword2>"'
+    command = (
+        "uv run --project skills/datasheet-intelligence "
+        "skills/datasheet-intelligence/scripts/search.py "
+        f'"{file_path}" {query_args} --unique-pages'
+    )
+
+    print(
+        "Tip: PDF bookmarks not found. For large PDFs, switch to search-first workflow.",
+        file=sys.stderr,
+    )
+    print(f"Try: {command}", file=sys.stderr)
+
+
 def extract_toc_fast(pdf_path: Path, filter_keywords: list[str] | None) -> list[dict]:
     """PDF 북마크 기반 고속 TOC 추출 (pypdfium2)"""
     import pypdfium2 as pdfium
@@ -148,6 +169,7 @@ def main():
                     }
                 )
             )
+            print_search_fallback_hint(args.file_path, filters)
         except:
             pass
         return

@@ -73,10 +73,11 @@ Choose the strategy by document size.
 Never read the whole document at once.
 
 1. Run `scripts/toc.py` to map sections and page ranges.
-2. Skip low-value sections (Legal, Revision History, Ordering Info, Package Drawing).
-3. Run `scripts/search.py` for exact keyword locations.
-4. Run `scripts/read.py --pages` in 10-30 page chunks.
-5. Iterate: read -> discover new keywords -> search again -> read again.
+2. If `scripts/toc.py` reports no bookmarks, switch immediately to `scripts/search.py` (search-first) instead of full `--structured` TOC.
+3. Skip low-value sections (Legal, Revision History, Ordering Info, Package Drawing).
+4. Run `scripts/search.py` for exact keyword locations (`--unique-pages` recommended for long documents).
+5. Run `scripts/read.py --pages` in 10-30 page chunks.
+6. Iterate: read -> discover new keywords -> search again -> read again.
 
 High-priority large-PDF sections:
 
@@ -116,7 +117,7 @@ uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/r
 uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/spec.docx --structured
 
 # Search
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE"
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE" --unique-pages
 uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/spec.docx "I2C0" "clock divider"
 uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/pinout.xlsx "GPIO" "FUNCSEL"
 uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" --structured
@@ -129,6 +130,7 @@ uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC
 
 - Start with TOC for PDF workflows.
 - Do selective reading for large documents.
+- If PDF bookmarks are missing, switch to search-first flow and avoid full structured TOC on very large files.
 - Use search-first flow for DOCX/XLSX.
 - Use `--structured` for register/electrical/timing tables when fidelity matters.
 - Keep explicit project context in every command (`uv run --project ...`).

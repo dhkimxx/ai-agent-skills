@@ -33,12 +33,17 @@ def compile_patterns(queries: list[str], is_regex: bool) -> list[re.Pattern]:
 
 
 def search_pdf_fast(
-    path: Path, patterns: list[re.Pattern], context_chars: int, max_hits: int
+    path: Path,
+    patterns: list[re.Pattern],
+    context_chars: int,
+    max_hits: int,
+    unique_pages: bool = False,
 ) -> int:
     import pypdfium2 as pdfium
 
     pdf = pdfium.PdfDocument(path)
     hits = 0
+    seen_keyword_pages: set[tuple[str, int]] = set()
 
     for page_idx, page in enumerate(pdf):
         if hits >= max_hits:
@@ -50,6 +55,11 @@ def search_pdf_fast(
             for match in pattern.finditer(text):
                 if hits >= max_hits:
                     break
+                page_num = page_idx + 1
+                dedupe_key = (pattern.pattern, page_num)
+                if unique_pages and dedupe_key in seen_keyword_pages:
+                    continue
+
                 s, e = match.span()
                 ctx = text[
                     max(0, s - context_chars) : min(len(text), e + context_chars)
@@ -58,13 +68,15 @@ def search_pdf_fast(
                     json.dumps(
                         {
                             "keyword": match.group(),
-                            "page": page_idx + 1,
+                            "page": page_num,
                             "context": f"...{ctx}...",
                             "mode": "fast",
                         },
                         ensure_ascii=False,
                     )
                 )
+                if unique_pages:
+                    seen_keyword_pages.add(dedupe_key)
                 hits += 1
 
         tp.close()
@@ -143,7 +155,9 @@ def search_xlsx_fast(path: Path, patterns: list[re.Pattern], max_hits: int) -> i
 # ---------------------------------------------------------------------------
 
 
-def search_structured(path: Path, patterns: list[re.Pattern], max_hits: int) -> int:
+def search_structured(
+    path: Path, patterns: list[re.Pattern], max_hits: int, unique_pages: bool = False
+) -> int:
     try:
         from docling.document_converter import DocumentConverter
         from docling.datamodel.document import TextItem, TableItem, SectionHeaderItem
@@ -167,6 +181,7 @@ def search_structured(path: Path, patterns: list[re.Pattern], max_hits: int) -> 
         return 0
 
     hits = 0
+    seen_keyword_pages: set[tuple[str, int]] = set()
 
     # 문서 순회
     # docling의 iterate_items는 (item, level)을 반환한다.
@@ -203,6 +218,11 @@ def search_structured(path: Path, patterns: list[re.Pattern], max_hits: int) -> 
                 # 문맥 정보 구성
                 # TextItem, TableItem 등은 prov(페이지 정보)를 가질 수 있다.
                 page_no = item.prov[0].page_no if item.prov else None
+                if unique_pages and page_no is not None:
+                    dedupe_key = (pattern.pattern, page_no)
+                    if dedupe_key in seen_keyword_pages:
+                        continue
+                    seen_keyword_pages.add(dedupe_key)
 
                 # 결과 출력
                 print(
@@ -252,6 +272,11 @@ def main():
         "--max-hits", type=int, default=20, help="최대 결과 수 (기본: 20)"
     )
     parser.add_argument(
+        "--unique-pages",
+        action="store_true",
+        help="PDF/structured 검색에서 같은 페이지의 중복 결과를 키워드별로 1개로 축약",
+    )
+    parser.add_argument(
         "--structured", action="store_true", help="docling으로 레이아웃/구조 인식 검색"
     )
     args = parser.parse_args()
@@ -264,12 +289,18 @@ def main():
     hits = 0
 
     if args.structured:
-        hits = search_structured(args.file_path, patterns, args.max_hits)
+        hits = search_structured(
+            args.file_path, patterns, args.max_hits, args.unique_pages
+        )
     else:
         suffix = args.file_path.suffix.lower()
         if suffix == ".pdf":
             hits = search_pdf_fast(
-                args.file_path, patterns, args.context_chars, args.max_hits
+                args.file_path,
+                patterns,
+                args.context_chars,
+                args.max_hits,
+                args.unique_pages,
             )
         elif suffix == ".docx":
             hits = search_docx_fast(args.file_path, patterns, args.max_hits)

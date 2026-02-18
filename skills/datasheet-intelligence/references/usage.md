@@ -99,6 +99,7 @@ Returns matches with a ±200 character context window.
 ```bash
 uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON"
 uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE"
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE" --unique-pages
 ```
 
 Output: `{"keyword", "page", "context"}`
@@ -135,4 +136,5 @@ Output: `{"keyword", "section", "page", "type", "content_snippet"}`
 | `queries` | One or more search keywords |
 | `--regex` | Treat queries as regular expressions |
 | `--structured` | Structure-aware search via docling |
+| `--unique-pages` | For PDF/structured search, keep at most one hit per page per query pattern |
 | `--max-hits` | Maximum result count (default: 20) |
