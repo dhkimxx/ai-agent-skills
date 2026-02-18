@@ -70,7 +70,6 @@ uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
 - Preserve image presence in markdown with `![image_ref](path)` entries.
 - Keep section anchors and normalize textual references like `See Table 4.2` into markdown links when anchor targets exist.
 - Run on all provided files and summarize failures without stopping the whole batch unless explicitly requested.
-- Emit a reusable system prompt hint file that tells downstream agents to check `.context/knowledge` first.
 - For detailed CLI options and execution presets, read `references/execution-options.md`.
 - If `uv` is unavailable, follow the fallback instructions in `references/execution-options.md`.
 

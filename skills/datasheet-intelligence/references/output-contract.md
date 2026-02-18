@@ -25,8 +25,6 @@ For CLI runtime flags and presets, see `references/execution-options.md`.
 
 - `knowledge.index.json`
   - Manifest for all processed datasheets and run-level timestamp.
-- `AGENT_PROMPT.md`
-  - System prompt hint that directs agents to inspect `.context/knowledge` first.
 
 ## Retrieval Pattern
 

@@ -4,9 +4,9 @@ Codex, Claude, Antigravity에서 공통으로 사용할 수 있는 vendor-neutra
 
 ## Skills Table
 
-| 스킬 이름 | 경로 | `skills.sh` Install Command (`npx`) |
-| --- | --- | --- |
-| `datasheet-intelligence` | `skills/datasheet-intelligence` | `npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence` |
+| 스킬 이름 |  `skills.sh` Install Command (`npx`) |
+| --- |  --- |
+| `datasheet-intelligence` | `npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence` |
 
 ## Layout
 

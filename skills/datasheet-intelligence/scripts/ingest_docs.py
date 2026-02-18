@@ -657,21 +657,6 @@ def process_document(
     return meta
 
 
-def write_agent_prompt_hint(output_dir: Path) -> None:
-    prompt_path = output_dir / "AGENT_PROMPT.md"
-    prompt_text = (
-        "# Agent Prompt Hint\n\n"
-        "Datasheets are normalized into Markdown under `.context/knowledge`.\n"
-        "Search that folder first before answering implementation questions.\n\n"
-        "Recommended system prompt:\n"
-        "\"\n"
-        "Datasheets are already normalized into Markdown. "
-        "Always inspect `.context/knowledge` first.\n"
-        "\"\n"
-    )
-    prompt_path.write_text(prompt_text, encoding="utf-8")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Convert PDF/DOCX/HTML/MD/XLSX/CSV datasheets into normalized Markdown artifacts.",
@@ -786,8 +771,6 @@ def main() -> int:
 
         metas.append(meta)
         print(f"{doc_id}: {meta['status']}")
-
-    write_agent_prompt_hint(output_dir)
 
     index = {
         "generated_at_utc": now_utc_iso(),
