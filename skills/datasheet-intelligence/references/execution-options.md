@@ -76,6 +76,9 @@ uv run python3 scripts/ingest_docs.py <source...> --output-dir .context/knowledg
   - Disable PDF OCR for speed when text is already machine-readable.
 - `--no-retry-no-ocr`
   - Disable automatic one-time PDF retry with OCR disabled.
+- `--fast`
+  - Enable fast mode (Force `--no-ocr`, `--no-images`, and disable table structure analysis).
+  - Recommended for large files (>100 pages) or when only text is needed.
 - `--skip-preflight`
   - Skip dependency checks from `scripts/check_deps.py`.
 - `--debug`
@@ -106,6 +109,19 @@ uv run python3 scripts/ingest_docs.py docs/datasheets --pdf-backend pypdfium2
 # Debug run for deeper error diagnostics
 uv run python3 scripts/ingest_docs.py docs/datasheets --debug -v
 ```
+
+### Large Files & Performance
+
+For documents exceeding 100 pages (e.g., full MCU datasheets), the default pipeline may be slow due to table structure analysis and OCR.
+
+| Flag | Disables | Use Case |
+| :--- | :--- | :--- |
+| `--fast` | OCR, Tables, Images | **Recommended**: Maximum speed for large files when you only need text search. |
+| `--no-ocr` | OCR | Balanced speed for digital-native PDFs where table structure is important. |
+| `--no-images` | Images | Reduces output size but keeps text/tables. |
+
+> [!TIP]
+> Use `--fast` first for 500+ page documents. If you miss table data, try `--no-ocr`.
 
 ## `scripts/check_deps.py`
 

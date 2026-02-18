@@ -14,10 +14,10 @@ Ingest multi-format datasheets into a single Markdown-first knowledge base so ag
 This skill requires `uv` for dependency management and optionally `tesseract` for OCR.
 
 1. **Check `uv`**: Run `uv --version`.
-2. **Check Dependencies**: Run `uv run python3 scripts/check_deps.py --pdf-backend docling_parse`.
+2. **Check Dependencies**: Run `uv run python3 scripts/check_deps.py` (checks docling, pdfium, and tesseract).
 
 > [!NOTE]
-> If `uv` or `tesseract` are missing, see [installation.md](references/installation.md) for OS-specific setup instructions.
+> If `uv` or `tesseract` are missing, see [installation.md](references/installation.md). Tesseract is optional but recommended for scanned PDFs.
 
 Scripts in this skill use **PEP 723 inline metadata**. `uv run` will automatically install all required dependencies (docling, pypdfium2, etc.) in an ephemeral environment.
 
@@ -32,16 +32,16 @@ Scripts in this skill use **PEP 723 inline metadata**. `uv run` will automatical
 ## Commands
 
 ```bash
-# Check runtime dependencies first
-uv run python3 scripts/check_deps.py --pdf-backend docling_parse
+# Check runtime dependencies
+uv run python3 scripts/check_deps.py
 
-# Ingest all supported datasheets from a directory
+# Ingest all supported datasheets (Standard)
 uv run python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
 
-# Ingest Word/Excel-heavy directories in the same pipeline
-uv run python3 scripts/ingest_docs.py docs/specs_word docs/register_excel --output-dir .context/knowledge
+# Ingest large files quickly (No OCR, No Tables, No Images) - Recommended for >100 pages
+uv run python3 scripts/ingest_docs.py docs/datasheets --fast
 
-# Ingest only top-level files and skip OCR for faster runs
+# Ingest only top-level files without OCR
 uv run python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
 
 # If PDF conversion is unstable, switch backend explicitly
