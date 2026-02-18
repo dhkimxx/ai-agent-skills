@@ -2,6 +2,34 @@
 
 Use this guide when choosing runtime flags for datasheet ingestion and retrieval scripts.
 
+## Priority Policy
+
+When a task requires datasheet evidence (for example register-level code generation, bit setting validation, timing/pin constraints), run this pipeline first:
+
+1. `scripts/check_deps.py`
+2. `scripts/ingest_docs.py`
+3. `scripts/search_docs.py`
+4. `scripts/read_docs.py`
+
+This policy applies even when the user directly asks for code and even when source files are Word/Excel.
+Avoid direct source parsing commands (`pdftotext`, `docx2txt`, `antiword`, `xlsx2csv`, `pandoc`, ad-hoc regex scraping) unless ingestion is blocked or fails.
+
+## Command Order (Recommended)
+
+```bash
+# 1) Preflight dependency checks
+uv run python3 scripts/check_deps.py --pdf-backend docling_parse
+
+# 2) Ingest mixed-format source files (PDF/DOCX/XLSX/CSV/HTML/MD)
+uv run python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
+
+# 3) Search candidate sections for required facts
+uv run python3 scripts/search_docs.py "I2C0 clock divider" --knowledge-dir .context/knowledge
+
+# 4) Read the exact section/table before answering
+uv run python3 scripts/read_docs.py rp2040 --anchor i2c-controller --max-lines 200
+```
+
 ## Repository Hygiene
 
 Before running ingestion in a new repo, ignore generated knowledge artifacts:
@@ -18,63 +46,14 @@ If you want broader ignore coverage for skill outputs, prefer `.context/`.
 
 ## Prerequisites
 
-Validate `uv` first:
-
-```bash
-uv --version
-```
-
-If `uv` is missing, install by OS:
-
-```bash
-# macOS (Homebrew)
-brew install uv
-
-# Linux (official installer)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-```powershell
-# Windows (WinGet)
-winget install --id=astral-sh.uv -e
-```
-
-Reopen the terminal after installation and run `uv --version` again.
-
-## No-`uv` Fallback
-
-Use this only when `uv` installation is blocked by policy or environment constraints.
-
-```bash
-# macOS / Linux
-python3 -m venv .venv
-source .venv/bin/activate
-python3 -m pip install -U pip
-python3 -m pip install docling
-
-python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
-python3 scripts/search_docs.py "SPI0 address" --knowledge-dir .context/knowledge
-python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
-```
-
-```powershell
-# Windows PowerShell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-python -m pip install docling
-
-python scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
-python scripts/search_docs.py "SPI0 address" --knowledge-dir .context/knowledge
-python scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
-```
+See [installation.md](installation.md) for setup instructions (including `uv`, OCR, and non-uv fallbacks).
 
 ## `scripts/ingest_docs.py`
 
 Base command:
 
 ```bash
-uv run --with docling python3 scripts/ingest_docs.py <source...> --output-dir .context/knowledge
+uv run python3 scripts/ingest_docs.py <source...> --output-dir .context/knowledge
 ```
 
 ### Options
@@ -90,8 +69,17 @@ uv run --with docling python3 scripts/ingest_docs.py <source...> --output-dir .c
   - Default: `220`
 - `--non-recursive`
   - Process only the top-level files in each source directory.
+- `--pdf-backend {docling_parse,pypdfium2}`
+  - Select PDF backend explicitly.
+  - Default: `docling_parse`
 - `--no-ocr`
   - Disable PDF OCR for speed when text is already machine-readable.
+- `--no-retry-no-ocr`
+  - Disable automatic one-time PDF retry with OCR disabled.
+- `--skip-preflight`
+  - Skip dependency checks from `scripts/check_deps.py`.
+- `--debug`
+  - Enable traceback output and debug logs for failure diagnostics.
 - `--no-images`
   - Skip image extraction to reduce runtime and output size.
 - `--fail-on-error`
@@ -104,13 +92,50 @@ uv run --with docling python3 scripts/ingest_docs.py <source...> --output-dir .c
 
 ```bash
 # Balanced default run
-uv run --with docling python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
+uv run python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
 
 # Faster run (no OCR, no nested folders)
-uv run --with docling python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
+uv run python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
 
 # CI-safe run (fail fast on conversion errors)
-uv run --with docling python3 scripts/ingest_docs.py docs/datasheets --fail-on-error -v
+uv run python3 scripts/ingest_docs.py docs/datasheets --fail-on-error -v
+
+# Force pypdfium2 backend for PDF parsing
+uv run python3 scripts/ingest_docs.py docs/datasheets --pdf-backend pypdfium2
+
+# Debug run for deeper error diagnostics
+uv run python3 scripts/ingest_docs.py docs/datasheets --debug -v
+```
+
+## `scripts/check_deps.py`
+
+Base command:
+
+```bash
+uv run python3 scripts/check_deps.py --pdf-backend docling_parse
+```
+
+### Options
+
+- `--pdf-backend {docling_parse,pypdfium2}`
+  - Validate dependency health for the selected backend.
+- `--no-ocr`
+  - Skip OCR binary checks.
+- `--require-uv`
+  - Treat missing/unhealthy `uv` as failure.
+- `--require-tesseract`
+  - Treat missing/unhealthy `tesseract` as failure when OCR is enabled.
+- `-v`, `--verbose`
+  - Print pass-level checks too.
+
+### Preset Examples
+
+```bash
+# Default preflight for docling_parse backend
+uv run python3 scripts/check_deps.py --pdf-backend docling_parse -v
+
+# Strict OCR preflight for Tesseract path
+uv run python3 scripts/check_deps.py --pdf-backend pypdfium2 --require-tesseract
 ```
 
 ## `scripts/search_docs.py`
@@ -182,3 +207,51 @@ uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2 --max-lin
 - Generated artifacts are grouped per document under `.context/knowledge/<doc_id>/`.
 - Start with default chunk settings unless retrieval quality is clearly poor.
 - Use `--fail-on-error` in CI; skip it for exploratory local batch runs.
+
+## Troubleshooting OCR/PDF Errors
+
+If you see OCR- or PDF-backend-related failures, follow this order:
+
+1. Run dependency preflight:
+
+```bash
+uv run python3 scripts/check_deps.py --pdf-backend docling_parse -v
+```
+
+2. Inspect `.context/knowledge/<doc_id>/<doc_id>.meta.json` to identify the concrete error message.
+3. Re-run with OCR disabled:
+
+```bash
+uv run python3 scripts/ingest_docs.py docs/datasheets --no-ocr -v
+```
+
+4. If failure persists, switch backend:
+
+```bash
+uv run python3 scripts/ingest_docs.py docs/datasheets --pdf-backend pypdfium2 -v
+```
+
+5. If failures are opaque, re-run with debug:
+
+```bash
+uv run python3 scripts/ingest_docs.py docs/datasheets --debug -v
+```
+
+6. If both backend/ocr retries fail, keep the `.meta.json` errors in the report and avoid speculative root-cause claims.
+
+Notes:
+
+- `Cannot close object; pdfium library is destroyed` can appear as a follow-up warning after earlier PDF processing failures.
+- `scripts/ingest_docs.py` already retries failed PDF conversions once with OCR disabled unless `--no-retry-no-ocr` is specified.
+
+## Anti-Patterns
+
+- Do not mix raw-file parser output and `.context/knowledge` output in the same factual answer.
+- Do not cite register addresses/bitfields without an anchorable source from ingested artifacts.
+- Do not skip `search_docs.py`/`read_docs.py` when the answer requires datasheet-backed precision.
+
+## Official References
+
+- Docling installation (OCR engine system packages): https://docling-project.github.io/docling/usage/
+- Docling OCR model options (Tesseract/Tesseract-CLI behavior): https://docling-project.github.io/docling/reference/pipeline_options/
+- pypdfium2 runtime notes (bundled wheels and fallback setup): https://github.com/pypdfium2-team/pypdfium2

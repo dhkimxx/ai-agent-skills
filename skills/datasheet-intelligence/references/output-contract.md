@@ -1,7 +1,7 @@
 # Output Contract
 
 Use this schema when consuming generated artifacts from `.context/knowledge`.
-For CLI runtime flags and presets, see `references/execution-options.md`.
+For CLI runtime flags and presets, see [execution-options.md](execution-options.md).
 
 ## Files Per Datasheet
 
@@ -33,3 +33,12 @@ For CLI runtime flags and presets, see `references/execution-options.md`.
 1. Search `.sections.jsonl` using `scripts/search_docs.py`.
 2. Open matching markdown via `scripts/read_docs.py`.
 3. Resolve details from `.tables.md` when tabular values conflict with prose.
+
+## Evidence Contract (For Answers/Code)
+
+When producing datasheet-grounded output, include evidence mapped from ingested artifacts:
+
+- Minimum citation unit: `doc_id + section_anchor` (or equivalent section identifier).
+- If register values come from tables, add the `.tables.md` source note.
+- For each critical claim (address, bit position, reset value, formula), provide at least one citation unit.
+- If evidence cannot be located in `.context/knowledge`, mark the claim as unverified and request additional source ingestion instead of guessing.

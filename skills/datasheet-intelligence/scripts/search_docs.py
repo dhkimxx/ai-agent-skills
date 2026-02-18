@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Search section chunks in .context/knowledge."""
 
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
 from __future__ import annotations
 
 import argparse
@@ -19,12 +24,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Knowledge directory produced by ingest_docs.py.",
     )
     parser.add_argument("--regex", action="store_true", help="Treat query as regex.")
-    parser.add_argument("--case-sensitive", action="store_true", help="Case-sensitive matching.")
-    parser.add_argument("--max-hits", type=int, default=20, help="Maximum hits to print.")
+    parser.add_argument(
+        "--case-sensitive", action="store_true", help="Case-sensitive matching."
+    )
+    parser.add_argument(
+        "--max-hits", type=int, default=20, help="Maximum hits to print."
+    )
     return parser
 
 
-def compile_pattern(query: str, as_regex: bool, case_sensitive: bool) -> re.Pattern[str]:
+def compile_pattern(
+    query: str, as_regex: bool, case_sensitive: bool
+) -> re.Pattern[str]:
     flags = 0 if case_sensitive else re.IGNORECASE
     if as_regex:
         return re.compile(query, flags)
@@ -95,7 +106,9 @@ def main() -> int:
     except re.error as exc:
         print(f"ERROR: invalid regex pattern: {exc}", file=sys.stderr)
         return 2
-    hits = search_sections(knowledge_dir=knowledge_dir, pattern=pattern, max_hits=args.max_hits)
+    hits = search_sections(
+        knowledge_dir=knowledge_dir, pattern=pattern, max_hits=args.max_hits
+    )
     print(f"hits: {hits}")
     return 0 if hits > 0 else 1
 

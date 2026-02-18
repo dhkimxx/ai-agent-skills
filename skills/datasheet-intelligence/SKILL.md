@@ -1,6 +1,6 @@
 ---
 name: datasheet-intelligence
-description: Convert mixed-format datasheets and hardware reference files (PDF, DOCX, HTML, Markdown, XLSX/CSV) into normalized Markdown knowledge files for AI coding agents. Use when a user asks to ingest datasheets, register maps, pinout/timing sheets, revision histories, or internal hardware notes before searching datasheet content or generating code. Produce RAG-ready section chunks, anchors, image references, and metadata under .context/knowledge.
+description: Prioritize this skill for any hardware task that requires datasheet-grounded facts or code (register addresses, bit fields, init sequences, timing/pin constraints). Ingest mixed-format sources (PDF, DOCX, HTML, Markdown, XLSX/CSV) with scripts/ingest_docs.py, then answer from .context/knowledge artifacts. Use this even when the user asks directly for code generation from datasheets; avoid ad-hoc source parsers (pdftotext, docx2txt, xlsx2csv, etc.) unless ingestion is blocked or fails.
 ---
 
 # Datasheet Intelligence
@@ -11,51 +11,44 @@ Ingest multi-format datasheets into a single Markdown-first knowledge base so ag
 
 ## Prerequisites
 
-Check `uv` first:
+This skill requires `uv` for dependency management and optionally `tesseract` for OCR.
 
-```bash
-uv --version
-```
+1. **Check `uv`**: Run `uv --version`.
+2. **Check Dependencies**: Run `uv run python3 scripts/check_deps.py --pdf-backend docling_parse`.
 
-If `uv` is not installed, install it by OS:
+> [!NOTE]
+> If `uv` or `tesseract` are missing, see [installation.md](references/installation.md) for OS-specific setup instructions.
 
-```sh
-# macOS (Homebrew)
-brew install uv
-
-# Linux (official installer)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Windows (WinGet)
-winget install --id=astral-sh.uv -e
-```
-
-After installation, restart the shell and verify `uv --version` again.
+Scripts in this skill use **PEP 723 inline metadata**. `uv run` will automatically install all required dependencies (docling, pypdfium2, etc.) in an ephemeral environment.
 
 ## Workflow
 
-1. Place source datasheets in a folder (for example `docs/datasheets/`).
-2. Run `scripts/ingest_docs.py` with `uv run --with docling python3`.
-3. Read outputs from `.context/knowledge/`:
-   - `<doc>/<doc>.md`: normalized markdown
-   - `<doc>/<doc>.sections.jsonl`: section chunks for retrieval
-   - `<doc>/<doc>.tables.md`: table-focused markdown
-   - `<doc>/<doc>.meta.json`: conversion metadata and validation info
-   - `<doc>/<doc>.docling.json`: raw Docling structured export
-   - `<doc>/_images/*`: extracted images
-   - `knowledge.index.json`: corpus manifest
-4. Use search/read helpers:
-   - `scripts/search_docs.py` for corpus search
-   - `scripts/read_docs.py` for focused section reads
+1. If required docs are already ingested in `.context/knowledge/`, skip re-ingest.
+2. If docs are missing, run `scripts/check_deps.py` then `scripts/ingest_docs.py`.
+3. Read outputs from `.context/knowledge/`. See [output-contract.md](references/output-contract.md) for the file structure.
+4. Use `scripts/search_docs.py` and `scripts/read_docs.py` to find and read specific sections.
+5. Draft the final answer citing specific `doc_id` and sections.
 
 ## Commands
 
 ```bash
+# Check runtime dependencies first
+uv run python3 scripts/check_deps.py --pdf-backend docling_parse
+
 # Ingest all supported datasheets from a directory
-uv run --with docling python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
+uv run python3 scripts/ingest_docs.py docs/datasheets --output-dir .context/knowledge
+
+# Ingest Word/Excel-heavy directories in the same pipeline
+uv run python3 scripts/ingest_docs.py docs/specs_word docs/register_excel --output-dir .context/knowledge
 
 # Ingest only top-level files and skip OCR for faster runs
-uv run --with docling python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
+uv run python3 scripts/ingest_docs.py docs/datasheets --non-recursive --no-ocr
+
+# If PDF conversion is unstable, switch backend explicitly
+uv run python3 scripts/ingest_docs.py docs/datasheets --pdf-backend pypdfium2
+
+# Debug mode (traceback + debug logs)
+uv run python3 scripts/ingest_docs.py docs/datasheets --debug -v
 
 # Search and focused read
 uv run python3 scripts/search_docs.py "SPI0 address" --knowledge-dir .context/knowledge
@@ -66,17 +59,27 @@ uv run python3 scripts/read_docs.py exynos_spi_v1 --anchor section-4-2
 
 - Use command-first guidance (above) instead of low-level converter internals.
 - Prefer `uv run` commands and do not assume a global `python` alias.
+- For datasheet-grounded tasks, this skill has higher priority than generic text extraction flows.
 - Keep output location at `.context/knowledge` unless user asks otherwise.
 - Before the first run, ensure generated artifacts are ignored by git (`.context/` or `.context/knowledge/` in `.gitignore`).
 - Preserve image presence in markdown with `![image_ref](path)` entries.
 - Keep section anchors and normalize textual references like `See Table 4.2` into markdown links when anchor targets exist.
 - Run on all provided files and summarize failures without stopping the whole batch unless explicitly requested.
+- Run `scripts/check_deps.py` before large ingestion batches to surface environment issues early.
+- Do not parse source files directly with ad-hoc tools (`pdftotext`, `pdfplumber`, `docx2txt`, `antiword`, `xlsx2csv`, `pandoc`, custom regex scraping) before trying `scripts/ingest_docs.py`.
+- For Word/Excel/PDF inputs, treat `scripts/ingest_docs.py` as the default and only extraction path.
+- Use `--debug` when failures are opaque and keep traceback logs with each failed `<doc>.meta.json`.
+- If ingestion fails for specific PDF files, check each `<doc>.meta.json` first, then retry deterministically with `--no-ocr` or `--pdf-backend pypdfium2` before proposing non-skill parsers.
+- `scripts/ingest_docs.py` automatically retries failed PDF documents once with OCR disabled unless `--no-retry-no-ocr` is set.
+- If both retries fail, report the concrete error from `.meta.json` and request approval before using any fallback parser.
+- For generated code or factual claims, cite the source from `.context/knowledge` (document + anchor/section; include table source when register values come from tables).
 - For detailed CLI options and execution presets, read `references/execution-options.md`.
 - If `uv` is unavailable, follow the fallback instructions in `references/execution-options.md`.
 
 ## Resources
 
 - `scripts/ingest_docs.py`: main ingestion pipeline
+- `scripts/check_deps.py`: preflight dependency checks
 - `scripts/search_docs.py`: chunk-level search helper
 - `scripts/read_docs.py`: focused reader helper
 - `references/output-contract.md`: output schema and retrieval contract

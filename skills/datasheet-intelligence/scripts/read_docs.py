@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Read a specific ingested datasheet markdown file, optionally by anchor."""
 
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
 from __future__ import annotations
 
 import argparse
@@ -12,7 +17,9 @@ ANCHOR_SUFFIX = '"></a>'
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Read datasheet markdown output from the knowledge folder.")
+    parser = argparse.ArgumentParser(
+        description="Read datasheet markdown output from the knowledge folder."
+    )
     parser.add_argument(
         "doc",
         help="Document id (e.g., exynos_spi_v1) or a markdown path.",

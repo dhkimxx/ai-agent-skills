@@ -18,8 +18,8 @@ npx skills add dhkimxx/ai-agent-skills --skill $SKILL_NAME
 # GitHub URL 방식
 npx skills add https://github.com/dhkimxx/ai-agent-skills --skill $SKILL_NAME
 
-# prompt 없이 global 설치
-npx skills add dhkimxx/ai-agent-skills --skill $SKILL_NAME -g -y
+# global 설치
+npx skills add dhkimxx/ai-agent-skills --skill $SKILL_NAME -g
 ```
 
 이 repository 기준 기본 예시:
