@@ -16,15 +16,21 @@ from __future__ import annotations
 # ///
 
 import argparse
+import base64
+import hashlib
 import json
 import logging
+import mimetypes
 import re
+import shutil
 import sys
+import time
 import traceback
+from collections.abc import Generator, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, BinaryIO, Literal
 
 from docling.backend.abstract_backend import AbstractDocumentBackend
 from docling.backend.docling_parse_backend import DoclingParseDocumentBackend
@@ -92,6 +98,15 @@ def safe_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def get_project_root() -> Path:
+    """Find the project root by looking for a .git directory."""
+    current_path = Path.cwd().resolve()
+    for parent in [current_path, *current_path.parents]:
+        if (parent / ".git").is_dir():
+            return parent
+    return current_path
 
 
 def configure_logging(debug: bool) -> None:
@@ -822,8 +837,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--output-dir",
-        default=".context/knowledge",
-        help="Destination for markdown knowledge artifacts (default: .context/knowledge).",
+        default=get_project_root() / ".context/knowledge",
+        help="Destination for markdown knowledge artifacts (default: ProjectRoot/.context/knowledge).",
     )
     parser.add_argument(
         "--chunk-max-chars",

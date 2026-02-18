@@ -16,6 +16,15 @@ ANCHOR_PREFIX = '<a id="'
 ANCHOR_SUFFIX = '"></a>'
 
 
+def get_project_root() -> Path:
+    """Find the project root by looking for a .git directory."""
+    current_path = Path.cwd().resolve()
+    for parent in [current_path, *current_path.parents]:
+        if (parent / ".git").is_dir():
+            return parent
+    return current_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Read datasheet markdown output from the knowledge folder."
@@ -26,8 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--knowledge-dir",
-        default=".context/knowledge",
-        help="Knowledge directory produced by ingest_docs.py.",
+        default=get_project_root() / ".context/knowledge",
+        help="Knowledge directory produced by ingest_docs.py (default: ProjectRoot/.context/knowledge).",
     )
     parser.add_argument(
         "--anchor",

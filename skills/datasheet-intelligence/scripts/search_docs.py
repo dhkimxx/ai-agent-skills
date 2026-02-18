@@ -15,13 +15,22 @@ import sys
 from pathlib import Path
 
 
+def get_project_root() -> Path:
+    """Find the project root by looking for a .git directory."""
+    current_path = Path.cwd().resolve()
+    for parent in [current_path, *current_path.parents]:
+        if (parent / ".git").is_dir():
+            return parent
+    return current_path
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Search ingested datasheets.")
     parser.add_argument("query", help="Search keyword or regex pattern.")
     parser.add_argument(
         "--knowledge-dir",
-        default=".context/knowledge",
-        help="Knowledge directory produced by ingest_docs.py.",
+        default=get_project_root() / ".context/knowledge",
+        help="Knowledge directory produced by ingest_docs.py (default: ProjectRoot/.context/knowledge).",
     )
     parser.add_argument("--regex", action="store_true", help="Treat query as regex.")
     parser.add_argument(
