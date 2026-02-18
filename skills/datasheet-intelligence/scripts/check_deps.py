@@ -210,8 +210,9 @@ def check_tesseract(no_ocr: bool, require_tesseract: bool) -> CheckMessage:
             code="tesseract_not_found",
             message="`tesseract` executable not found.",
             hint=(
-                "Docling can still run with non-Tesseract OCR paths, but Tesseract-based OCR will fail. "
-                "Install Tesseract or run with --no-ocr."
+                "Tesseract is missing. For OCR support, install it via `brew install tesseract` (macOS), "
+                "`sudo apt-get install tesseract-ocr` (Linux), or use format-specific installers (Windows). "
+                "Otherwise, use `--no-ocr` to disable OCR."
             ),
         )
 

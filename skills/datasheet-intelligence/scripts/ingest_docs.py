@@ -222,10 +222,13 @@ def resolve_pdf_backend_class(pdf_backend: str) -> type[AbstractDocumentBackend]
 
 
 def build_converter(
-    no_ocr: bool, no_images: bool, pdf_backend: str
+    no_ocr: bool,
+    no_images: bool,
+    pdf_backend: str,
+    do_table_structure: bool = True,
 ) -> DocumentConverter:
     pdf_options = PdfPipelineOptions()
-    pdf_options.do_table_structure = True
+    pdf_options.do_table_structure = do_table_structure
     pdf_options.do_ocr = not no_ocr
     pdf_options.generate_picture_images = not no_images
     pdf_options.generate_page_images = False
@@ -854,6 +857,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable automatic one-time retry with OCR disabled for failed PDFs.",
     )
     parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Fast mode: Force --no-ocr, --no-images, and disable table structure analysis.",
+    )
+    parser.add_argument(
         "--skip-preflight",
         action="store_true",
         help="Skip dependency preflight checks (not recommended).",
@@ -879,9 +887,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def check_pdf_pages(path: Path) -> int:
+    try:
+        import pypdfium2 as pdfium  # type: ignore
+
+        pdf = pdfium.PdfDocument(str(path))
+        count = len(pdf)
+        pdf.close()
+        return count
+    except Exception:
+        return 0
+
+
 def main() -> int:
     args = build_parser().parse_args()
     configure_logging(args.debug)
+
+    if args.fast:
+        args.no_ocr = True
+        args.no_images = True
 
     if args.chunk_max_chars <= 0:
         print("ERROR: --chunk-max-chars must be > 0", file=sys.stderr)
@@ -937,13 +961,36 @@ def main() -> int:
         no_ocr=args.no_ocr,
         no_images=args.no_images,
         pdf_backend=args.pdf_backend,
+        do_table_structure=not args.fast,
     )
     retry_converter_without_ocr: DocumentConverter | None = None
     used_doc_ids: set[str] = set()
     metas: list[dict[str, Any]] = []
 
-    for source_path in source_paths:
-        doc_id = unique_doc_id(sanitize_doc_id(source_path.stem), used_doc_ids)
+    for idx, source_path in enumerate(source_paths, start=1):
+        doc_id = sanitize_doc_id(source_path.stem)
+        doc_id = unique_doc_id(
+            doc_id, used_doc_ids
+        )  # Note: simple unique in this context
+
+        # Pre-check large file size
+        if resolve_format(source_path) == InputFormat.PDF:
+            page_count = check_pdf_pages(source_path)
+            if page_count > 0:
+                print(
+                    f"[{idx}/{len(source_paths)}] Processing {source_path.name} ({page_count} pages)..."
+                )
+                if page_count > 100 and not (args.fast or args.no_ocr):
+                    print(
+                        f"  [WARN] Large file detected (>100 pages). "
+                        "If it hangs, try `--fast` or `--no-ocr`.",
+                        file=sys.stderr,
+                    )
+            else:
+                print(f"[{idx}/{len(source_paths)}] Processing {source_path.name}...")
+        else:
+            print(f"[{idx}/{len(source_paths)}] Processing {source_path.name}...")
+
         if args.verbose:
             print(f"[ingest] {source_path} -> {doc_id}")
 
@@ -970,6 +1017,7 @@ def main() -> int:
                     no_ocr=True,
                     no_images=args.no_images,
                     pdf_backend=args.pdf_backend,
+                    do_table_structure=not args.fast,
                 )
             initial_status = str(meta.get("status", "UNKNOWN"))
             if args.verbose:
