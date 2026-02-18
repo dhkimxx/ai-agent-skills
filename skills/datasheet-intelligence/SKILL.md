@@ -1,6 +1,6 @@
 ---
 name: datasheet-intelligence
-description: Trigger this skill first for datasheet-backed hardware tasks: register map/address lookup, bitfield/reset-value checks, pin mux and timing/clock constraints, and C/firmware init code that must cite page/section evidence. High-signal terms include datasheet, register, bitfield, base address, reset value, init code, clock divider, I2C/SPI/UART/GPIO, TRM, 데이터시트, 레지스터, 초기화 코드.
+description: "Trigger this skill first for datasheet-backed hardware tasks: register map/address lookup, bitfield/reset-value checks, pin mux and timing/clock constraints, and C/firmware init code that must cite page/section evidence."
 ---
 
 # Datasheet Intelligence
