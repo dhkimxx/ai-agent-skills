@@ -11,6 +11,13 @@ import sys
 from pathlib import Path
 
 
+def print_next_step(tip: str, command: str | None = None) -> None:
+    """에러 직후 다음 액션을 동일 포맷(Tip/Try)으로 안내한다."""
+    print(f"Tip: {tip}", file=sys.stderr)
+    if command:
+        print(f"Try: {command}", file=sys.stderr)
+
+
 def print_search_fallback_hint(file_path: Path, filters: list[str] | None) -> None:
     """북마크가 없는 PDF에서 search-first 폴백 명령을 안내한다."""
     query_tokens = [k for k in (filters or []) if k]
@@ -24,12 +31,10 @@ def print_search_fallback_hint(file_path: Path, filters: list[str] | None) -> No
         "skills/datasheet-intelligence/scripts/search.py "
         f'"{file_path}" {query_args} --unique-pages'
     )
-
-    print(
-        "Tip: PDF bookmarks not found. For large PDFs, switch to search-first workflow.",
-        file=sys.stderr,
+    print_next_step(
+        "PDF 북마크가 없어 search-first 워크플로우로 전환하는 것을 권장합니다.",
+        command,
     )
-    print(f"Try: {command}", file=sys.stderr)
 
 
 def extract_toc_fast(pdf_path: Path, filter_keywords: list[str] | None) -> list[dict]:
@@ -40,6 +45,11 @@ def extract_toc_fast(pdf_path: Path, filter_keywords: list[str] | None) -> list[
         pdf = pdfium.PdfDocument(pdf_path)
     except Exception as e:
         print(f"Error: PDF 열기 실패 — {e}", file=sys.stderr)
+        print_next_step(
+            "파일 손상 여부를 확인하거나 structured 모드로 재시도하세요.",
+            "uv run --project skills/datasheet-intelligence --with docling "
+            f'skills/datasheet-intelligence/scripts/toc.py "{pdf_path}" --structured',
+        )
         return []
 
     toc = []
@@ -71,11 +81,11 @@ def extract_toc_structured(
         from docling.document_converter import DocumentConverter
         from docling.datamodel.document import SectionHeaderItem
     except ImportError:
-        print(
-            "Error: --structured 모드는 docling이 필요합니다.\n"
-            "실행 예시: uv run --project skills/datasheet-intelligence --with docling "
+        print("Error: --structured 모드는 docling이 필요합니다.", file=sys.stderr)
+        print_next_step(
+            "docling extra를 포함해 structured 모드로 다시 실행하세요.",
+            "uv run --project skills/datasheet-intelligence --with docling "
             "skills/datasheet-intelligence/scripts/toc.py <file> --structured",
-            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -121,6 +131,11 @@ def extract_toc_structured(
 
     except Exception as e:
         print(f"Error: 구조적 TOC 파싱 실패 — {e}", file=sys.stderr)
+        print_next_step(
+            "TOC 대신 search-first로 페이지 후보를 먼저 찾으세요.",
+            "uv run --project skills/datasheet-intelligence "
+            f'skills/datasheet-intelligence/scripts/search.py "{file_path}" <query1> <query2> --unique-pages',
+        )
         sys.exit(1)
 
 
@@ -137,6 +152,10 @@ def main():
 
     if not args.file_path.exists():
         print(f"Error: 파일 없음 — {args.file_path}", file=sys.stderr)
+        print_next_step(
+            "파일 경로를 다시 확인하세요.",
+            f'ls -l "{args.file_path}"',
+        )
         sys.exit(1)
 
     filters = [k.strip() for k in args.filter.split(",")] if args.filter else None
@@ -176,6 +195,11 @@ def main():
 
     if not toc:
         print(json.dumps({"info": "목차 항목 없음"}), file=sys.stderr)
+        print_next_step(
+            "관련 키워드로 search-first 흐름을 사용해 필요한 페이지를 찾으세요.",
+            "uv run --project skills/datasheet-intelligence "
+            f'skills/datasheet-intelligence/scripts/search.py "{args.file_path}" <query1> <query2> --unique-pages',
+        )
         return
 
     for item in toc:

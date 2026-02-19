@@ -14,6 +14,13 @@ import sys
 from pathlib import Path
 
 
+def print_next_step(tip: str, command: str | None = None) -> None:
+    """에러 직후 다음 액션을 동일 포맷(Tip/Try)으로 안내한다."""
+    print(f"Tip: {tip}", file=sys.stderr)
+    if command:
+        print(f"Try: {command}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------------
 # 공통 검색 로직
 # ---------------------------------------------------------------------------
@@ -162,11 +169,11 @@ def search_structured(
         from docling.document_converter import DocumentConverter
         from docling.datamodel.document import TextItem, TableItem, SectionHeaderItem
     except ImportError:
-        print(
-            "Error: --structured 모드는 docling이 필요합니다.\n"
-            "실행 예시: uv run --project skills/datasheet-intelligence --with docling "
+        print("Error: --structured 모드는 docling이 필요합니다.", file=sys.stderr)
+        print_next_step(
+            "docling extra를 포함해 structured 검색으로 다시 실행하세요.",
+            "uv run --project skills/datasheet-intelligence --with docling "
             "skills/datasheet-intelligence/scripts/search.py <file> <query> --structured",
-            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -178,6 +185,11 @@ def search_structured(
         doc = result.document
     except Exception as e:
         print(f"Error: docling 파싱 실패 — {e}", file=sys.stderr)
+        print_next_step(
+            "우선 fast 모드로 검색해 페이지 후보를 좁힌 뒤 structured를 재시도하세요.",
+            "uv run --project skills/datasheet-intelligence "
+            f'skills/datasheet-intelligence/scripts/search.py "{path}" <query> --unique-pages',
+        )
         return 0
 
     hits = 0
@@ -283,6 +295,10 @@ def main():
 
     if not args.file_path.exists():
         print(f"Error: 파일 없음 — {args.file_path}", file=sys.stderr)
+        print_next_step(
+            "파일 경로를 다시 확인하세요.",
+            f'ls -l "{args.file_path}"',
+        )
         sys.exit(1)
 
     patterns = compile_patterns(args.queries, args.regex)
@@ -308,10 +324,20 @@ def main():
             hits = search_xlsx_fast(args.file_path, patterns, args.max_hits)
         else:
             print(f"Error: 미지원 포맷 '{suffix}'. (Fast 모드)", file=sys.stderr)
+            print_next_step(
+                "지원 포맷(PDF/DOCX/XLSX)으로 실행하거나 structured 모드로 전환하세요.",
+                "uv run --project skills/datasheet-intelligence --with docling "
+                f'skills/datasheet-intelligence/scripts/search.py "{args.file_path}" <query> --structured',
+            )
             sys.exit(1)
 
     if hits == 0:
         print("결과 없음.", file=sys.stderr)
+        print_next_step(
+            "키워드를 확장하거나 --regex/--structured 옵션을 검토하세요.",
+            "uv run --project skills/datasheet-intelligence "
+            f'skills/datasheet-intelligence/scripts/search.py "{args.file_path}" <query1> <query2> --unique-pages',
+        )
 
 
 if __name__ == "__main__":

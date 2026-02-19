@@ -1,9 +1,17 @@
 ---
 name: datasheet-intelligence
-description: "Trigger this skill first for datasheet-backed hardware tasks: register map/address lookup, bitfield/reset-value checks, pin mux and timing/clock constraints, and C/firmware init code that must cite page/section evidence."
+description: "Use for datasheet/TRM-backed register tasks and init-code generation with citation evidence (page/section). High-signal cues: datasheet, register, bitfield, base address, reset value, init code, TRM, 데이터시트, 레지스터, 초기화 코드."
+argument-hint: "[document-path] [task-or-keywords]"
 ---
 
 # Datasheet Intelligence
+
+## Manual Invocation (If Auto-Trigger Misses)
+
+- Run `/datasheet-intelligence <document-path> <task-or-keywords>`.
+- If invoked with slash arguments, treat `$ARGUMENTS` as the highest-priority input for document path and task keywords.
+- Rephrase the user request with high-signal terms from the description (`datasheet`, `register`, `bitfield`, `init code`, `데이터시트`, `레지스터`).
+- Include concrete targets (for example: peripheral name, register name, or timing parameter) so matching is less ambiguous.
 
 ## When To Trigger
 
@@ -32,6 +40,11 @@ Help the agent read datasheets efficiently and produce evidence-grounded answers
 - `PDF`: use TOC + targeted page reads.
 - `DOCX/XLSX`: search first, then read only relevant parts.
 - `--structured`: use Docling when table/header fidelity is required.
+
+## Context Loading Rules
+
+- Keep default context lean: run `scripts/toc.py`, `scripts/search.py`, `scripts/read.py` directly first.
+- Load `references/usage.md` only when detailed CLI flags or format-specific examples are needed.
 
 ## Prerequisites
 
@@ -98,33 +111,24 @@ High-priority large-PDF sections:
 3. Use `scripts/read.py --structured` when layout/table structure is critical.
 4. If no hits, expand keywords and retry search before full reading.
 
-## Commands
+## Quick Commands
 
-Use `--structured` with `uv run --project ... --with docling`.
+Use `--structured` only when table/header fidelity is required.
 
 ```bash
 SKILL_DIR="skills/datasheet-intelligence"
 
-# TOC
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/toc.py" docs/rp2040.pdf
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/toc.py" docs/rp2040.pdf --filter "I2C,GPIO,RESET"
-uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/toc.py" docs/spec.docx --structured
-
-# Read
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/read.py" docs/spec.docx
-uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470 --structured
-uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/spec.docx --structured
-
-# Search
+# 1) Find candidate pages first
 uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" "I2C0_BASE" --unique-pages
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/spec.docx "I2C0" "clock divider"
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/pinout.xlsx "GPIO" "FUNCSEL"
-uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_CON" --structured
 
-# Regex search
-uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC_\\w+" --regex --max-hits 10
+# 2) Read only selected ranges
+uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470
+
+# 3) Switch to structured mode only if layout fidelity is critical
+uv run --project "$SKILL_DIR" --with docling "$SKILL_DIR/scripts/read.py" docs/rp2040.pdf --pages 464-470 --structured
 ```
+
+For full flags and format-specific examples, read `references/usage.md`.
 
 ## Operational Rules
 
@@ -132,7 +136,7 @@ uv run --project "$SKILL_DIR" "$SKILL_DIR/scripts/search.py" docs/rp2040.pdf "IC
 - Do selective reading for large documents.
 - If PDF bookmarks are missing, switch to search-first flow and avoid full structured TOC on very large files.
 - Use search-first flow for DOCX/XLSX.
-- Use `--structured` for register/electrical/timing tables when fidelity matters.
+- Prefer fast mode by default; use `--structured` only for table/header fidelity issues.
 - Keep explicit project context in every command (`uv run --project ...`).
 - Read enough neighboring context to avoid missing table headers/footnotes.
 - Cross-check register values against Address Map / Register List sections.

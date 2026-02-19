@@ -15,6 +15,13 @@ import tempfile
 from pathlib import Path
 
 
+def print_next_step(tip: str, command: str | None = None) -> None:
+    """에러 직후 다음 액션을 동일 포맷(Tip/Try)으로 안내한다."""
+    print(f"Tip: {tip}", file=sys.stderr)
+    if command:
+        print(f"Try: {command}", file=sys.stderr)
+
+
 # ---------------------------------------------------------------------------
 # 공통: 구조적 파싱 (docling)
 # ---------------------------------------------------------------------------
@@ -25,11 +32,11 @@ def read_structured(path: Path, pages: list[int] | None = None) -> None:
     try:
         from docling.document_converter import DocumentConverter
     except ImportError:
-        print(
-            "Error: --structured 모드는 docling이 필요합니다.\n"
-            "실행 예시: uv run --project skills/datasheet-intelligence --with docling "
+        print("Error: --structured 모드는 docling이 필요합니다.", file=sys.stderr)
+        print_next_step(
+            "docling extra를 포함해 structured 모드로 다시 실행하세요.",
+            "uv run --project skills/datasheet-intelligence --with docling "
             "skills/datasheet-intelligence/scripts/read.py <file> --structured",
-            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -59,6 +66,18 @@ def read_structured(path: Path, pages: list[int] | None = None) -> None:
 
     except Exception as e:
         print(f"Error: 구조적 파싱 실패 — {e}", file=sys.stderr)
+        base_command = (
+            "uv run --project skills/datasheet-intelligence "
+            "skills/datasheet-intelligence/scripts/read.py "
+            f'"{path}"'
+        )
+        if pages:
+            page_args = ",".join(str(page) for page in pages)
+            base_command += f" --pages {page_args}"
+        print_next_step(
+            "먼저 기본 모드로 같은 범위를 확인한 뒤, 필요한 경우에만 --structured를 사용하세요.",
+            base_command,
+        )
         sys.exit(1)
     finally:
         if tmp_path and tmp_path.exists():
@@ -110,6 +129,11 @@ def read_pdf(path: Path, pages: list[int]) -> None:
 
     if not valid:
         print(f"Error: 유효한 페이지 없음. 전체 {total}페이지.", file=sys.stderr)
+        print_next_step(
+            "먼저 전체 페이지 수를 확인한 뒤 올바른 범위를 지정하세요.",
+            "uv run --project skills/datasheet-intelligence "
+            f'skills/datasheet-intelligence/scripts/read.py "{path}"',
+        )
         return
 
     for num in valid:
@@ -180,6 +204,10 @@ def main():
 
     if not args.file_path.exists():
         print(f"Error: 파일 없음 — {args.file_path}", file=sys.stderr)
+        print_next_step(
+            "파일 경로를 다시 확인하세요.",
+            f'ls -l "{args.file_path}"',
+        )
         sys.exit(1)
 
     # --structured 모드 공통 처리 (포맷 무관)
@@ -198,6 +226,11 @@ def main():
 
             pdf = pdfium.PdfDocument(args.file_path)
             print(f"PDF: 전체 {len(pdf)}페이지. --pages 옵션으로 범위를 지정하세요.")
+            print_next_step(
+                "범위 지정 후 필요한 페이지만 읽으세요.",
+                "uv run --project skills/datasheet-intelligence "
+                f'skills/datasheet-intelligence/scripts/read.py "{args.file_path}" --pages 1-5',
+            )
             return
         read_pdf(args.file_path, _parse_page_range(args.pages))
 
@@ -211,6 +244,11 @@ def main():
         print(
             f"Error: 미지원 포맷 '{suffix}'. PDF, DOCX, XLSX를 지원합니다.",
             file=sys.stderr,
+        )
+        print_next_step(
+            "지원 포맷 파일로 다시 실행하거나, docling structured 모드를 검토하세요.",
+            "uv run --project skills/datasheet-intelligence --with docling "
+            f'skills/datasheet-intelligence/scripts/read.py "{args.file_path}" --structured',
         )
         sys.exit(1)
 
