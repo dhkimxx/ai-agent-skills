@@ -1,50 +1,21 @@
 ---
 name: datasheet-intelligence
-description: "Use for datasheet/TRM-backed register tasks and init-code generation with citation evidence (page/section). High-signal cues: datasheet, register, bitfield, base address, reset value, init code, TRM, 데이터시트, 레지스터, 초기화 코드."
+description: "This skill is triggered when a request needs datasheet/TRM-grounded hardware facts or firmware init code with page/section citations. Keywords: datasheet, TRM, register map, base address, bitfield, reset value, pin mux, clock divider, init code, 데이터시트, 레지스터, 초기화 코드."
 argument-hint: "[document-path] [task-or-keywords]"
 ---
 
 # Datasheet Intelligence
 
-## Manual Invocation (If Auto-Trigger Misses)
+## Objective
 
-- Run `/datasheet-intelligence <document-path> <task-or-keywords>`.
-- If invoked with slash arguments, treat `$ARGUMENTS` as the highest-priority input for document path and task keywords.
-- Rephrase the user request with high-signal terms from the description (`datasheet`, `register`, `bitfield`, `init code`, `데이터시트`, `레지스터`).
-- Include concrete targets (for example: peripheral name, register name, or timing parameter) so matching is less ambiguous.
+- Produce evidence-grounded hardware answers and code from `PDF`/`DOCX`/`XLSX` datasheets.
+- Prefer fast mode by default; use `--structured` only when table/header fidelity is required.
 
-## When To Trigger
+## Context Policy
 
-Use this skill immediately when the request requires document-grounded hardware facts.
-
-- Register-level code generation or review (addresses, bit masks, reset values).
-- Datasheet-based initialization sequences (`I2C`, `SPI`, `UART`, `GPIO`, clocks, reset flow).
-- Verification tasks that require evidence citation (`file + page/section`).
-- Questions over provided hardware docs (`PDF`, `DOCX`, `XLSX`) rather than generic coding.
-
-### High-Signal Prompt Cues
-
-- English: `datasheet`, `register map`, `bitfield`, `base address`, `reset value`, `clock divider`, `pin mux`, `init code`.
-- Korean or mixed: `데이터시트 기반`, `레지스터 근거`, `비트필드`, `초기화 코드`, `베이스 주소`, `클럭 분주`.
-
-## When Not To Trigger
-
-- Pure refactoring/style tasks with no datasheet or hardware-document evidence requirement.
-- Generic programming Q&A unrelated to hardware manuals or register specifications.
-- Tasks that can be solved from local source code alone without hardware documentation.
-
-## Purpose
-
-Help the agent read datasheets efficiently and produce evidence-grounded answers.
-
-- `PDF`: use TOC + targeted page reads.
-- `DOCX/XLSX`: search first, then read only relevant parts.
-- `--structured`: use Docling when table/header fidelity is required.
-
-## Context Loading Rules
-
-- Keep default context lean: run `scripts/toc.py`, `scripts/search.py`, `scripts/read.py` directly first.
-- Load `references/usage.md` only when detailed CLI flags or format-specific examples are needed.
+- Keep `SKILL.md` minimal and procedural.
+- Run `scripts/toc.py`, `scripts/search.py`, `scripts/read.py` directly before loading extra references.
+- Load `references/usage.md` only for detailed flags or format-specific examples.
 
 ## Prerequisites
 
@@ -62,6 +33,15 @@ Use one of these execution contexts:
 - Alternative: `cd skills/datasheet-intelligence && uv run ...`
 
 All command examples below use the recommended `--project` style.
+
+## Mandatory Execution Loop
+
+1. MUST identify candidate pages first with `scripts/toc.py` or `scripts/search.py` before large reads.
+2. MUST read targeted ranges with `scripts/read.py --pages` and expand iteratively.
+3. MUST verify every critical claim (address, bit position, reset value, formula) with `source file + page/section`.
+4. MUST rerun extraction on mismatch or ambiguity (`search -> read -> search`).
+5. MUST follow `Tip:` / `Try:` guidance from script errors, then rerun.
+6. MUST not finalize the answer until critical code settings are mapped to citations.
 
 ## Workflow
 
@@ -132,24 +112,18 @@ For full flags and format-specific examples, read `references/usage.md`.
 
 ## Operational Rules
 
-- Start with TOC for PDF workflows.
-- Do selective reading for large documents.
-- If PDF bookmarks are missing, switch to search-first flow and avoid full structured TOC on very large files.
-- Use search-first flow for DOCX/XLSX.
-- Prefer fast mode by default; use `--structured` only for table/header fidelity issues.
-- Keep explicit project context in every command (`uv run --project ...`).
-- Read enough neighboring context to avoid missing table headers/footnotes.
-- Cross-check register values against Address Map / Register List sections.
-- Use iterative exploration (read -> search -> read).
+1. Start with TOC for PDF workflows.
+2. If bookmarks are missing, switch to search-first flow and avoid full structured TOC for very large PDFs.
+3. Keep explicit project context in every command (`uv run --project ...`).
+4. Read enough neighboring context to avoid missing table headers/footnotes.
+5. Cross-check register values against Address Map / Register List sections.
 
 ## Output Contract
 
-For datasheet-grounded answers or code:
-
-- Provide evidence for each critical claim (address, bit position, reset value, formula): `source file + page/section`.
-- Map important code settings to their evidence locations.
-- Do not guess unverifiable values; mark them as unverified.
-- If table/prose conflicts exist, report the conflict and separate uncertain items.
+1. MUST provide evidence for each critical claim (address, bit position, reset value, formula): `source file + page/section`.
+2. MUST map important code settings to evidence locations.
+3. MUST mark unverifiable values as unverified.
+4. MUST report table/prose conflicts and separate uncertain items.
 
 ## Resources
 

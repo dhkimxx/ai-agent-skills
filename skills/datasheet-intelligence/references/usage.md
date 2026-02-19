@@ -1,5 +1,11 @@
 # Usage Guide
 
+## Table of Contents
+
+- [`scripts/toc.py` — TOC Extraction](#scriptstocpy--toc-extraction)
+- [`scripts/read.py` — Text Extraction](#scriptsreadpy--text-extraction)
+- [`scripts/search.py` — Keyword Search](#scriptssearchpy--keyword-search)
+
 All scripts auto-detect document format by file extension.
 Use `uv run --project skills/datasheet-intelligence ...` as the default execution style.
 When using `--structured`, add `--with docling`.
