@@ -4,15 +4,9 @@ Vendor-neutral skill repository for Codex, Claude, and Antigravity.
 
 ## Skills
 
-| Skill | Description |
-| --- | --- |
-| [datasheet-intelligence](skills/datasheet-intelligence) | Datasheet-grounded hardware facts extraction & code generation |
-
-## Install
-
-```bash
-npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence
-```
+| Skill | Description | Install |
+| --- | --- | --- |
+| [datasheet-intelligence](skills/datasheet-intelligence) | Datasheet-grounded hardware facts extraction & code generation | `npx skills add dhkimxx/ai-agent-skills --skill datasheet-intelligence` |
 
 ## Validate
 
