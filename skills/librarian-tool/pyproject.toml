@@ -1,0 +1,11 @@
+[project]
+name = "librarian-tool"
+version = "0.1.0"
+description = "Manage docs/ metadata with frontmatter-first workflow"
+requires-python = ">=3.10"
+dependencies = [
+    "ruamel.yaml>=0.18.0",
+]
+
+[project.scripts]
+doc-manager = "doc_manager:main"

@@ -1,3 +1,16 @@
+---
+title: "datasheet-intelligence skill 소개"
+created: 2026-02-19
+updated: 2026-03-12
+author: "dhkimxx <dhkimxx@naver.com>"
+editors: ["dhkimxx <dhkimxx@naver.com>"]
+type: "guide"
+tags: ["datasheet-intelligence", "skill", "docs", "agentskills", "uv"]
+history:
+  - "2026-02-19 dhkimxx <dhkimxx@naver.com>: 최초 작성"
+  - "2026-03-12 dhkimxx <dhkimxx@naver.com>: 문서 포맷 통일"
+---
+
 # datasheet-intelligence skill 소개
 
 ## agentskills.io와 skill.sh
