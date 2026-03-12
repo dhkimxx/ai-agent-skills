@@ -52,7 +52,7 @@ Recommended execution style:
 uv run --project skills/meta-docs skills/meta-docs/doc_manager.py <command> [options]
 ```
 
-Use `--root` when the project root differs from the current working directory.
+Use `--root` when the project root differs from the current working directory. You can place `--root` before or after the subcommand.
 
 ## Mandatory Behavior Rules
 
@@ -100,13 +100,13 @@ uv run --project skills/meta-docs skills/meta-docs/doc_manager.py update --path 
 
 ### 4) create
 
-- Input: `--title "..." --tags "..." --content "..."`
-- Behavior: create `YYYYMMDD-{TITLE}.md` under `docs/` (type fixed to `log`)
-- Filename rule: `{TITLE}` is normalized to lowercase and may contain only digits, `-`, and `_`
+- Input: `--title "..." --tags "..." --content "..." [--type "log"]`
+- Behavior: create `YYYYMMDD-{TITLE}.md` under `docs/` (type defaults to `log`, override with `--type`)
+- Title rule: use English titles so filename slugs stay within lowercase a-z, digits, `-`, and `_`
 - `author`/`editors` prefer Git user info and fall back to system username
 
 Example:
 
 ```bash
-uv run --project skills/meta-docs skills/meta-docs/doc_manager.py create --title "redis-timeout" --tags "infra troubleshooting" --content "Root cause and fix"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py create --title "redis-timeout" --tags "infra troubleshooting" --content "Root cause and fix" --type "incident"
 ```

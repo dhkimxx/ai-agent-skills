@@ -23,6 +23,29 @@ class DocManagerError(Exception):
     pass
 
 
+def extract_root_arg(argv: List[str]) -> Tuple[Optional[str], List[str]]:
+    root_value: Optional[str] = None
+    cleaned: List[str] = []
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--root":
+            if index + 1 >= len(argv):
+                raise DocManagerError("--root 값이 비어 있습니다.")
+            root_value = argv[index + 1]
+            index += 2
+            continue
+        if arg.startswith("--root="):
+            root_value = arg.split("=", 1)[1]
+            if not root_value:
+                raise DocManagerError("--root 값이 비어 있습니다.")
+            index += 1
+            continue
+        cleaned.append(arg)
+        index += 1
+    return root_value, cleaned
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="doc_manager.py",
@@ -76,6 +99,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     create_parser.add_argument("--title", required=True, help="문서 제목.")
     create_parser.add_argument("--tags", required=True, help="태그(쉼표/공백 구분).")
     create_parser.add_argument("--content", required=True, help="본문 내용.")
+    create_parser.add_argument("--type", default=DEFAULT_LOG_TYPE, help="문서 타입(기본: log).")
 
     return parser
 
@@ -189,6 +213,10 @@ def resolve_docs_path(project_root: Path, path_input: str) -> Path:
     if not resolved.exists():
         raise DocManagerError("지정한 파일이 존재하지 않습니다.")
     return resolved
+
+
+def format_relative_path(project_root: Path, path: Path) -> str:
+    return path.relative_to(project_root).as_posix()
 
 
 def get_git_user_info(project_root: Path) -> Tuple[Optional[str], Optional[str]]:
@@ -364,7 +392,7 @@ def handle_search(project_root: Path, tags_input: str, types_input: str, dir_opt
         title = frontmatter.get("title")
         updated = frontmatter.get("updated")
         result = {
-            "file_path": str(path.relative_to(project_root)),
+            "file_path": format_relative_path(project_root, path),
             "title": str(title) if title is not None else None,
             "updated": str(updated) if updated is not None else None,
             "tags": tags,
@@ -438,18 +466,23 @@ def handle_update(project_root: Path, path_input: str, log: str) -> int:
     new_content = f"{FRONTMATTER_DELIMITER}\n{new_frontmatter}{FRONTMATTER_DELIMITER}\n{body_text}"
     target_path.write_text(new_content, encoding="utf-8")
 
-    output = {"file_path": str(target_path.relative_to(project_root)), "updated": today}
+    output = {
+        "file_path": format_relative_path(project_root, target_path),
+        "updated": today,
+    }
     print(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
     return 0
 
 
 def handle_create(
-    project_root: Path, title: str, tags_input: str, content: str
+    project_root: Path, title: str, tags_input: str, content: str, doc_type: str
 ) -> int:
     if not title.strip():
         raise DocManagerError("--title 값이 비어 있습니다.")
     if not tags_input.strip():
         raise DocManagerError("--tags 값이 비어 있습니다.")
+    if not doc_type.strip():
+        raise DocManagerError("--type 값이 비어 있습니다.")
 
     tags = parse_tags_input(tags_input)
     if not tags:
@@ -479,7 +512,7 @@ def handle_create(
         "updated": today,
         "author": editor,
         "editors": [editor],
-        "type": DEFAULT_LOG_TYPE,
+        "type": doc_type.strip(),
         "tags": tags,
         "history": [f"{today} {editor}: 최초 작성"],
     }
@@ -492,7 +525,10 @@ def handle_create(
     )
     target_path.write_text(file_content, encoding="utf-8")
 
-    output = {"file_path": str(target_path.relative_to(project_root)), "created": today}
+    output = {
+        "file_path": format_relative_path(project_root, target_path),
+        "created": today,
+    }
     print(json.dumps(output, ensure_ascii=False, separators=(",", ":")))
     return 0
 
@@ -503,7 +539,10 @@ def print_error(message: str) -> None:
 
 def main() -> None:
     parser = build_argument_parser()
-    args = parser.parse_args()
+    root_override, cleaned_argv = extract_root_arg(sys.argv[1:])
+    args = parser.parse_args(cleaned_argv)
+    if root_override is not None:
+        args.root = root_override
 
     try:
         project_root = resolve_project_root(args.root)
@@ -516,7 +555,7 @@ def main() -> None:
             exit_code = handle_update(project_root, args.path, args.log)
         elif args.command == "create":
             exit_code = handle_create(
-                project_root, args.title, args.tags, args.content
+                project_root, args.title, args.tags, args.content, args.type
             )
         else:
             raise DocManagerError("지원하지 않는 명령입니다.")
