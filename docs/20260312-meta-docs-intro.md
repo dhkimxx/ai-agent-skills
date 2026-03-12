@@ -1,17 +1,18 @@
 ---
-title: "librarian-tool 소개"
+title: "meta-docs 소개"
 created: 2026-03-12
 updated: 2026-03-12
 author: "dhkimxx <dhkimxx@naver.com>"
 editors: ["dhkimxx <dhkimxx@naver.com>"]
 type: "guide"
-tags: ["librarian-tool", "docs", "metadata", "frontmatter", "workflow"]
+tags: ["meta-docs", "docs", "metadata", "frontmatter", "workflow"]
 history:
   - "2026-03-12 dhkimxx <dhkimxx@naver.com>: 최초 작성"
   - "2026-03-12 dhkimxx <dhkimxx@naver.com>: 가이드 톤 개선 및 흐름 보강"
+  - "2026-03-12 dhkimxx <dhkimxx@naver.com>: meta-docs로 명칭 변경"
 ---
 
-# librarian-tool 소개
+# meta-docs 소개
 
 문서를 쌓아가다 보면 금방 이런 문제가 생깁니다.
 
@@ -19,7 +20,7 @@ history:
 - 본문을 통째로 읽느라 컨텍스트가 낭비된다.
 - 누가 언제 무엇을 바꿨는지 추적하기 어렵다.
 
-`librarian-tool`은 이 문제를 **"메타데이터 먼저, 본문은 나중"**이라는 원칙으로 풀어냅니다.
+`meta-docs`는 이 문제를 **"메타데이터 먼저, 본문은 나중"**이라는 원칙으로 풀어냅니다.
 
 ## 어떤 방식으로 동작하나요?
 
@@ -60,16 +61,16 @@ history:
 
 ```bash
 # 1) 메타데이터 검색
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py search --tags "docs metadata" --type "guide"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py search --tags "docs metadata" --type "guide"
 
 # 2) 본문 열람
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py read --path "docs/20260312-librarian-tool-intro.md"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py read --path "docs/20260312-meta-docs-intro.md"
 
 # 3) 히스토리 갱신
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py update --path "docs/20260312-librarian-tool-intro.md" --log "문서 규약 보강"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py update --path "docs/20260312-meta-docs-intro.md" --log "문서 규약 보강"
 
 # 4) 로그 생성
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py create --title "api-timeout" --tags "infra troubleshooting" --content "타임아웃 원인과 조치 내용"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py create --title "api-timeout" --tags "infra troubleshooting" --content "타임아웃 원인과 조치 내용"
 ```
 
 ## 기대 효과

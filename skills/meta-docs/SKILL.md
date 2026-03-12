@@ -1,10 +1,10 @@
 ---
-name: librarian-tool
-description: "A frontmatter-first docs workflow that separates metadata search from body reads. Keywords: docs, frontmatter, metadata, search, librarian."
+name: meta-docs
+description: "A frontmatter-first docs workflow that separates metadata search from body reads. Keywords: docs, frontmatter, metadata, search."
 argument-hint: "[search|read|update|create] [options]"
 ---
 
-# Librarian Tool
+# Meta Docs
 
 ## Objective
 
@@ -49,7 +49,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Recommended execution style:
 
 ```bash
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py <command> [options]
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py <command> [options]
 ```
 
 Use `--root` when the project root differs from the current working directory.
@@ -71,7 +71,7 @@ Use `--root` when the project root differs from the current working directory.
 Example:
 
 ```bash
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py search --tags "ai troubleshooting" --type "incident" --dir "team"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py search --tags "ai troubleshooting" --type "incident" --dir "team"
 ```
 
 ### 2) read
@@ -82,7 +82,7 @@ uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py sear
 Example:
 
 ```bash
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py read --path "docs/20260312-librarian-tool-intro.md"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py read --path "docs/20260312-meta-docs-intro.md"
 ```
 
 ### 3) update
@@ -95,7 +95,7 @@ uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py read
 Example:
 
 ```bash
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py update --path "docs/20260312-librarian-tool-intro.md" --log "architecture updates"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py update --path "docs/20260312-meta-docs-intro.md" --log "architecture updates"
 ```
 
 ### 4) create
@@ -108,5 +108,5 @@ uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py upda
 Example:
 
 ```bash
-uv run --project skills/librarian-tool skills/librarian-tool/doc_manager.py create --title "redis-timeout" --tags "infra troubleshooting" --content "Root cause and fix"
+uv run --project skills/meta-docs skills/meta-docs/doc_manager.py create --title "redis-timeout" --tags "infra troubleshooting" --content "Root cause and fix"
 ```

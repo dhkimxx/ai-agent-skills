@@ -1,5 +1,5 @@
 [project]
-name = "librarian-tool"
+name = "meta-docs"
 version = "0.1.0"
 description = "Manage docs/ metadata with frontmatter-first workflow"
 requires-python = ">=3.10"

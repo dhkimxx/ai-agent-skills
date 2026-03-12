@@ -387,7 +387,7 @@ def handle_read(project_root: Path, path_input: str) -> int:
     return 0
 
 
-def handle_update_history(project_root: Path, path_input: str, log: str) -> int:
+def handle_update(project_root: Path, path_input: str, log: str) -> int:
     if not log.strip():
         raise DocManagerError("--log 값이 비어 있습니다.")
 
@@ -443,7 +443,7 @@ def handle_update_history(project_root: Path, path_input: str, log: str) -> int:
     return 0
 
 
-def handle_create_log(
+def handle_create(
     project_root: Path, title: str, tags_input: str, content: str
 ) -> int:
     if not title.strip():
@@ -513,9 +513,9 @@ def main() -> None:
         elif args.command == "read":
             exit_code = handle_read(project_root, args.path)
         elif args.command == "update":
-            exit_code = handle_update_history(project_root, args.path, args.log)
+            exit_code = handle_update(project_root, args.path, args.log)
         elif args.command == "create":
-            exit_code = handle_create_log(
+            exit_code = handle_create(
                 project_root, args.title, args.tags, args.content
             )
         else:
