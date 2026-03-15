@@ -1,0 +1,283 @@
+from __future__ import annotations
+
+import argparse
+import json
+from typing import Any, Dict, Optional
+
+from .naver_land_client import NaverLandApiClient
+from .naver_land_repository import DefaultNaverLandRepository
+from .report_formatter import format_hybrid_report
+from .schemas import (
+    BoundingBox,
+    ComplexAnalysisInput,
+    HybridReportPayload,
+    InvestmentIndicatorInput,
+    ListingSearchInput,
+)
+from .services import (
+    ComparisonService,
+    ComplexAnalysisService,
+    DiscoveryService,
+    InvestmentIndicatorService,
+    ListingService,
+    ServiceError,
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="네이버 부동산 스카우터 CLI"
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    list_parser = subparsers.add_parser("listings", help="단지 매물 리스트 조회")
+    list_parser.add_argument("--complex-no", required=True)
+    list_parser.add_argument("--trade-type")
+    list_parser.add_argument("--real-estate-type")
+    list_parser.add_argument("--price-min")
+    list_parser.add_argument("--price-max")
+    list_parser.add_argument("--area-min")
+    list_parser.add_argument("--area-max")
+    list_parser.add_argument("--order", default="rank")
+    list_parser.add_argument("--page", type=int, default=1)
+    list_parser.add_argument("--directions", nargs="*")
+
+    complex_parser = subparsers.add_parser("complex", help="단지 리포트")
+    complex_parser.add_argument("--complex-no", required=True)
+    complex_parser.add_argument("--trade-type")
+    complex_parser.add_argument("--area-no")
+    complex_parser.add_argument("--year", type=int)
+    complex_parser.add_argument("--transport-zoom", type=int)
+    complex_parser.add_argument("--bbox", nargs=4, type=float, metavar=("LEFT", "RIGHT", "TOP", "BOTTOM"))
+    complex_parser.add_argument("--no-schools", action="store_true")
+    complex_parser.add_argument("--no-real-trades", action="store_true")
+
+    compare_parser = subparsers.add_parser("compare", help="매물 비교")
+    compare_parser.add_argument("--article-no", action="append", required=True)
+
+    invest_parser = subparsers.add_parser("invest", help="투자 지표")
+    invest_parser.add_argument("--article-no", required=True)
+
+    discover_parser = subparsers.add_parser("discover", help="지도 기반 탐색")
+    discover_parser.add_argument("--center-lat", type=float, required=True)
+    discover_parser.add_argument("--center-lon", type=float, required=True)
+    discover_parser.add_argument("--zoom", type=int, required=True)
+    discover_parser.add_argument("--left-lon", type=float, required=True)
+    discover_parser.add_argument("--right-lon", type=float, required=True)
+    discover_parser.add_argument("--top-lat", type=float, required=True)
+    discover_parser.add_argument("--bottom-lat", type=float, required=True)
+    discover_parser.add_argument("--real-estate-type", required=True)
+    discover_parser.add_argument("--price-type")
+    discover_parser.add_argument("--is-presale", action="store_true")
+
+    parser.add_argument(
+        "--header",
+        action="append",
+        default=[],
+        help="추가 헤더 (예: 'Referer:https://new.land.naver.com/')",
+    )
+    parser.add_argument(
+        "--cookie",
+        action="append",
+        default=[],
+        help="추가 쿠키 (예: 'NID_SES=...')",
+    )
+
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    headers = _parse_headers(args.header)
+    cookies = _parse_cookies(args.cookie)
+
+    client = NaverLandApiClient(headers=headers or None, cookies=cookies or None)
+    repository = DefaultNaverLandRepository(client)
+
+    try:
+        if args.command == "listings":
+            listing_input = _build_listing_input(args)
+            service = ListingService(repository)
+            result = service.search_by_complex(args.complex_no, listing_input)
+            payload = HybridReportPayload(
+                workflow="listings",
+                listing_result=result,
+            )
+        elif args.command == "complex":
+            service = ComplexAnalysisService(repository)
+            complex_input = ComplexAnalysisInput(
+                complex_no=args.complex_no,
+                trade_type=args.trade_type,
+                area_no=args.area_no,
+                year=args.year,
+            )
+            transport_bbox = _build_bbox(args)
+            report = service.create_report(
+                complex_input,
+                transport_bounding_box=transport_bbox,
+                transport_zoom=args.transport_zoom,
+                include_schools=not args.no_schools,
+                include_real_trades=not args.no_real_trades,
+            )
+            payload = HybridReportPayload(
+                workflow="complex",
+                complex_report=report,
+            )
+        elif args.command == "compare":
+            service = ComparisonService(repository)
+            comparison_result = service.compare_articles(args.article_no)
+            payload = HybridReportPayload(
+                workflow="compare",
+                comparison_result=comparison_result,
+            )
+        elif args.command == "invest":
+            service = InvestmentIndicatorService(repository)
+            investment_result = service.calculate_indicator(
+                InvestmentIndicatorInput(article_no=args.article_no)
+            )
+            payload = HybridReportPayload(
+                workflow="invest",
+                investment_indicator_result=investment_result,
+            )
+        elif args.command == "discover":
+            service = DiscoveryService(repository)
+            bounding_box = _build_bbox(args)
+            if bounding_box is None:
+                raise ServiceError(
+                    error_code="BBOX_REQUIRED",
+                    message="지도 탐색에는 bbox 파라미터가 필요합니다.",
+                )
+            listing_result = service.discover_by_map(
+                center_lat=args.center_lat,
+                center_lon=args.center_lon,
+                zoom=args.zoom,
+                bounding_box=bounding_box,
+                real_estate_type=args.real_estate_type,
+                price_type=args.price_type,
+                is_presale=args.is_presale,
+            )
+            payload = HybridReportPayload(
+                workflow="discover",
+                listing_result=listing_result,
+            )
+        else:
+            raise ServiceError(
+                error_code="UNKNOWN_COMMAND",
+                message="지원하지 않는 커맨드입니다.",
+            )
+
+        payload.generated_at = _utc_now()
+        report = format_hybrid_report(payload)
+        print(report)
+    except ServiceError as exc:
+        print(_format_service_error(exc))
+    finally:
+        client.close()
+
+
+def _parse_headers(raw_headers: list[str]) -> Dict[str, str]:
+    headers: Dict[str, str] = {}
+    for item in raw_headers:
+        if not item:
+            continue
+        if ":" not in item:
+            raise ServiceError(
+                error_code="HEADER_FORMAT_INVALID",
+                message="헤더 형식이 잘못되었습니다. 'Key:Value'로 입력하세요.",
+                details={"value": item},
+            )
+        key, value = item.split(":", 1)
+        headers[key.strip()] = value.strip()
+    return headers
+
+
+def _parse_cookies(raw_cookies: list[str]) -> Dict[str, str]:
+    cookies: Dict[str, str] = {}
+    for item in raw_cookies:
+        if not item:
+            continue
+        if "=" not in item:
+            raise ServiceError(
+                error_code="COOKIE_FORMAT_INVALID",
+                message="쿠키 형식이 잘못되었습니다. 'Key=Value'로 입력하세요.",
+                details={"value": item},
+            )
+        key, value = item.split("=", 1)
+        cookies[key.strip()] = value.strip()
+    return cookies
+
+
+def _build_listing_input(args: argparse.Namespace) -> ListingSearchInput:
+    price_range = _build_price_range(args.price_min, args.price_max)
+    area_range = _build_area_range(args.area_min, args.area_max)
+
+    return ListingSearchInput(
+        query_text="manual",
+        real_estate_type=args.real_estate_type,
+        trade_type=args.trade_type,
+        price_range=price_range,
+        area_range=area_range,
+        directions=args.directions,
+        order=args.order,
+        page=args.page,
+    )
+
+
+def _build_price_range(price_min: Optional[str], price_max: Optional[str]) -> Optional[Dict[str, Any]]:
+    if price_min is None and price_max is None:
+        return None
+    return {"minimum": price_min, "maximum": price_max}
+
+
+def _build_area_range(area_min: Optional[str], area_max: Optional[str]) -> Optional[Dict[str, Any]]:
+    if area_min is None and area_max is None:
+        return None
+    return {"minimum": area_min, "maximum": area_max}
+
+
+def _build_bbox(args: argparse.Namespace) -> Optional[BoundingBox]:
+    if args.bbox:
+        left, right, top, bottom = args.bbox
+        return BoundingBox(
+            left_lon=left,
+            right_lon=right,
+            top_lat=top,
+            bottom_lat=bottom,
+        )
+    if all(
+        value is not None
+        for value in [
+            getattr(args, "left_lon", None),
+            getattr(args, "right_lon", None),
+            getattr(args, "top_lat", None),
+            getattr(args, "bottom_lat", None),
+        ]
+    ):
+        return BoundingBox(
+            left_lon=args.left_lon,
+            right_lon=args.right_lon,
+            top_lat=args.top_lat,
+            bottom_lat=args.bottom_lat,
+        )
+    return None
+
+
+def _format_service_error(exc: ServiceError) -> str:
+    payload = {
+        "errorCode": exc.error_code,
+        "message": exc.message,
+        "details": exc.details,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _utc_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+if __name__ == "__main__":
+    main()
