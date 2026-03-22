@@ -5,3 +5,4 @@ __pycache__/
 .context/
 .agents/
 .tmp
+.skills-lock.json

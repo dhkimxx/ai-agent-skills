@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "meta-docs": {
+      "source": "dhkimxx/ai-agent-skills",
+      "sourceType": "github",
+      "computedHash": "357c6b58237f8d6b1eaffd34d188bd149711228e0d3bfdf8a80632a3be4c4e0e"
+    }
+  }
+}
