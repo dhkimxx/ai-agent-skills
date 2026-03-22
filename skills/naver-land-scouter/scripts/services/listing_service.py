@@ -6,7 +6,7 @@ from ..normalization import normalize_price_to_manwon
 from ..param_builder import build_article_list_params
 from ..schemas import ListingResult, ListingSearchInput, NormalizedArticle, RawArticleSummary
 from .contracts import NaverLandRepository
-from .errors import ServiceError
+from .errors import ServiceError, build_service_error
 
 
 class ListingService:
@@ -42,7 +42,8 @@ class ListingService:
                 sources=[context],
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 레이어에서 공통 포맷으로 변환한다.
-            raise ServiceError(
+            raise build_service_error(
+                exc,
                 error_code="LISTING_SEARCH_FAILED",
                 message="매물 검색에 실패했습니다.",
                 details={"complex_no": complex_no},

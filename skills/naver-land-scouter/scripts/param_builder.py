@@ -6,6 +6,8 @@ from .area_range import parse_area_range, parse_area_range_expression
 from .normalization import normalize_area_to_square_meter, normalize_price_to_manwon
 from .schemas import BoundingBox, ComplexAnalysisInput, ListingSearchInput, PriceRange
 
+MARKER_RANGE_MAX = 900000000
+
 
 def build_listing_search_params(listing_input: ListingSearchInput) -> Dict[str, Any]:
     params: Dict[str, Any] = {
@@ -72,11 +74,50 @@ def build_marker_params(
         "cortarNo": cortar_no,
         "zoom": zoom,
         "realEstateType": real_estate_type,
-        "priceType": price_type,
-        "isPresale": is_presale,
+        "priceType": price_type or "RETAIL",
+        "isPresale": True if is_presale is None else is_presale,
+        "markerId": "",
+        "markerType": "",
+        "selectedComplexNo": "",
+        "selectedComplexBuildingNo": "",
+        "fakeComplexMarker": "",
+        "tradeType": "",
+        "tag": "::::::::",
+        "rentPriceMin": 0,
+        "rentPriceMax": MARKER_RANGE_MAX,
+        "priceMin": 0,
+        "priceMax": MARKER_RANGE_MAX,
+        "areaMin": 0,
+        "areaMax": MARKER_RANGE_MAX,
+        "oldBuildYears": "",
+        "recentlyBuildYears": "",
+        "minHouseHoldCount": "",
+        "maxHouseHoldCount": "",
+        "showArticle": False,
+        "sameAddressGroup": False,
+        "minMaintenanceCost": "",
+        "maxMaintenanceCost": "",
+        "directions": "",
     }
     params.update(build_bounding_box_params(bounding_box))
-    return _filter_empty_params(params)
+    return _filter_empty_params(
+        params,
+        preserve_empty_string_keys={
+            "markerId",
+            "markerType",
+            "selectedComplexNo",
+            "selectedComplexBuildingNo",
+            "fakeComplexMarker",
+            "tradeType",
+            "oldBuildYears",
+            "recentlyBuildYears",
+            "minHouseHoldCount",
+            "maxHouseHoldCount",
+            "minMaintenanceCost",
+            "maxMaintenanceCost",
+            "directions",
+        },
+    )
 
 
 def build_complex_price_params(
@@ -149,12 +190,12 @@ def _build_area_range_params(
     if parsed_max:
         return _filter_empty_params({"areaMin": parsed_max[0], "areaMax": parsed_max[1]})
 
-    if isinstance(minimum, str):
+    if isinstance(minimum, str) and maximum is None:
         parsed_single = parse_area_range(minimum)
         if parsed_single:
             return _filter_empty_params({"areaMin": parsed_single[0], "areaMax": parsed_single[1]})
 
-    if isinstance(maximum, str):
+    if isinstance(maximum, str) and minimum is None:
         parsed_single = parse_area_range(maximum)
         if parsed_single:
             return _filter_empty_params({"areaMin": parsed_single[0], "areaMax": parsed_single[1]})
@@ -177,12 +218,16 @@ def _join_filter_values(values: Optional[Iterable[str]]) -> Optional[str]:
     return ":".join(filtered)
 
 
-def _filter_empty_params(params: Dict[str, Any]) -> Dict[str, Any]:
+def _filter_empty_params(
+    params: Dict[str, Any],
+    preserve_empty_string_keys: Optional[set[str]] = None,
+) -> Dict[str, Any]:
+    preserved_keys = preserve_empty_string_keys or set()
     filtered: Dict[str, Any] = {}
     for key, value in params.items():
         if value is None:
             continue
-        if isinstance(value, str) and not value:
+        if isinstance(value, str) and not value and key not in preserved_keys:
             continue
         if isinstance(value, (list, tuple, set)) and not value:
             continue

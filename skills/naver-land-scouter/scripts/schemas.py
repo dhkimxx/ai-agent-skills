@@ -135,14 +135,25 @@ class RawArticleSummary(NaverLandBaseModel):
     real_estate_type: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("realEstateType", "realEstateTypeCode")
     )
-    price: Optional[str] = None
-    deal_price: Optional[str] = Field(default=None, validation_alias=AliasChoices("dealPrice"))
-    rent_price: Optional[str] = Field(default=None, validation_alias=AliasChoices("rentPrice"))
-    area: Optional[float] = None
-    exclusive_area: Optional[float] = Field(
-        default=None, validation_alias=AliasChoices("exclusiveArea")
+    price: Optional[str | int | float] = Field(
+        default=None, validation_alias=AliasChoices("price", "dealOrWarrantPrc")
     )
-    supply_area: Optional[float] = Field(default=None, validation_alias=AliasChoices("supplyArea"))
+    deal_price: Optional[str | int | float] = Field(
+        default=None,
+        validation_alias=AliasChoices("dealPrice", "dealOrWarrantPrc"),
+    )
+    rent_price: Optional[str | int | float] = Field(
+        default=None, validation_alias=AliasChoices("rentPrice")
+    )
+    area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("area", "area1")
+    )
+    exclusive_area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("exclusiveArea", "area2")
+    )
+    supply_area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("supplyArea", "area1")
+    )
     floor_info: Optional[str] = Field(default=None, validation_alias=AliasChoices("floorInfo"))
     direction: Optional[str] = None
     article_feature_description: Optional[str] = Field(
@@ -183,6 +194,36 @@ class RawNeighborhoodInfo(NaverLandBaseModel):
     distance: Optional[float] = None
     latitude: Optional[float] = Field(default=None, validation_alias=AliasChoices("lat"))
     longitude: Optional[float] = Field(default=None, validation_alias=AliasChoices("lon"))
+
+
+class RawComplexMarker(NaverLandBaseModel):
+    marker_id: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("markerId", "complexNo")
+    )
+    marker_type: Optional[str] = Field(default=None, validation_alias=AliasChoices("markerType"))
+    complex_name: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("complexName", "name")
+    )
+    real_estate_type_code: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("realEstateTypeCode", "realEstateType"),
+    )
+    median_deal_price: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("medianDealPrice", "dealPrice")
+    )
+    min_deal_price: Optional[float] = Field(default=None, validation_alias=AliasChoices("minDealPrice"))
+    max_deal_price: Optional[float] = Field(default=None, validation_alias=AliasChoices("maxDealPrice"))
+    representative_area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("representativeArea", "area")
+    )
+    min_area: Optional[float | str] = Field(default=None, validation_alias=AliasChoices("minArea"))
+    max_area: Optional[float | str] = Field(default=None, validation_alias=AliasChoices("maxArea"))
+    deal_count: Optional[int] = Field(default=None, validation_alias=AliasChoices("dealCount"))
+    lease_count: Optional[int] = Field(default=None, validation_alias=AliasChoices("leaseCount"))
+    rent_count: Optional[int] = Field(default=None, validation_alias=AliasChoices("rentCount"))
+    total_article_count: Optional[int] = Field(
+        default=None, validation_alias=AliasChoices("totalArticleCount")
+    )
 
 
 class RawPricePoint(NaverLandBaseModel):

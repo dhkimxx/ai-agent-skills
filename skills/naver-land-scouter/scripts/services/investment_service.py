@@ -4,8 +4,9 @@ from typing import Optional
 
 from ..normalization import normalize_price_to_manwon
 from ..schemas import InvestmentIndicatorInput, InvestmentIndicatorResult, RawArticleDetail
+from .article_payload import flatten_article_payload
 from .contracts import NaverLandRepository
-from .errors import ServiceError
+from .errors import ServiceError, build_service_error
 
 
 class InvestmentIndicatorService:
@@ -27,7 +28,7 @@ class InvestmentIndicatorService:
             payload, context = self._repository.fetch_article_detail(
                 investment_input.article_no
             )
-            parsed = RawArticleDetail.model_validate(payload)
+            parsed = RawArticleDetail.model_validate(flatten_article_payload(payload))
             sale_price = normalize_price_to_manwon(parsed.deal_price or parsed.price)
             rent_price = normalize_price_to_manwon(parsed.rent_price)
 
@@ -53,7 +54,8 @@ class InvestmentIndicatorService:
                 sources=[context],
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 공통 에러로 변환한다.
-            raise ServiceError(
+            raise build_service_error(
+                exc,
                 error_code="INVESTMENT_INDICATOR_FAILED",
                 message="투자 지표 계산에 실패했습니다.",
                 details={"article_no": investment_input.article_no},

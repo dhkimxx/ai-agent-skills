@@ -26,7 +26,7 @@ from ..schemas import (
     RawSchoolInfo,
 )
 from .contracts import NaverLandRepository
-from .errors import ServiceError
+from .errors import ServiceError, build_service_error
 
 
 class ComplexAnalysisService:
@@ -101,7 +101,8 @@ class ComplexAnalysisService:
                 sources=sources,
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 공통 에러로 변환한다.
-            raise ServiceError(
+            raise build_service_error(
+                exc,
                 error_code="COMPLEX_REPORT_FAILED",
                 message="단지 리포트 생성에 실패했습니다.",
                 details={"complex_no": complex_input.complex_no},
