@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 from typing import Any, Dict, Optional
 
 from .naver_land_client import NaverLandApiClient
@@ -82,6 +84,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="추가 쿠키 (예: 'NID_SES=...')",
     )
+    parser.add_argument(
+        "--bootstrap-mode",
+        choices=["auto", "none", "http", "browser"],
+        default=None,
+        help="세션 부트스트랩 방식 (기본값: auto)",
+    )
 
     return parser
 
@@ -90,10 +98,19 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
 
-    headers = _parse_headers(args.header)
-    cookies = _parse_cookies(args.cookie)
+    env_headers = _read_env_headers()
+    env_cookies = _read_env_cookies()
+    headers = {**env_headers, **_parse_headers(args.header)}
+    cookies = {**env_cookies, **_parse_cookies(args.cookie)}
+    bootstrap_mode = args.bootstrap_mode or os.getenv(
+        "NAVER_LAND_BOOTSTRAP_MODE", "auto"
+    )
 
-    client = NaverLandApiClient(headers=headers or None, cookies=cookies or None)
+    client = NaverLandApiClient(
+        headers=headers or None,
+        cookies=cookies or None,
+        bootstrap_mode=bootstrap_mode,
+    )
     repository = DefaultNaverLandRepository(client)
 
     try:
@@ -209,6 +226,37 @@ def _parse_cookies(raw_cookies: list[str]) -> Dict[str, str]:
     return cookies
 
 
+def _read_env_headers() -> Dict[str, str]:
+    raw = os.getenv("NAVER_LAND_HEADERS")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return {str(key): str(value) for key, value in parsed.items()}
+    except json.JSONDecodeError:
+        pass
+    return _parse_headers(_split_env_items(raw))
+
+
+def _read_env_cookies() -> Dict[str, str]:
+    raw = os.getenv("NAVER_LAND_COOKIES") or os.getenv("NAVER_LAND_COOKIE")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return {str(key): str(value) for key, value in parsed.items()}
+    except json.JSONDecodeError:
+        pass
+    return _parse_cookies(_split_env_items(raw))
+
+
+def _split_env_items(raw: str) -> list[str]:
+    items = re.split(r"[;\n]+", raw)
+    return [item.strip() for item in items if item.strip()]
+
+
 def _build_listing_input(args: argparse.Namespace) -> ListingSearchInput:
     price_range = _build_price_range(args.price_min, args.price_max)
     area_range = _build_area_range(args.area_min, args.area_max)
@@ -238,8 +286,9 @@ def _build_area_range(area_min: Optional[str], area_max: Optional[str]) -> Optio
 
 
 def _build_bbox(args: argparse.Namespace) -> Optional[BoundingBox]:
-    if args.bbox:
-        left, right, top, bottom = args.bbox
+    bbox = getattr(args, "bbox", None)
+    if bbox:
+        left, right, top, bottom = bbox
         return BoundingBox(
             left_lon=left,
             right_lon=right,

@@ -5,6 +5,8 @@ from scripts.normalization import (
     normalize_area_to_square_meter,
     normalize_price_to_manwon,
 )
+from scripts.param_builder import build_listing_search_params
+from scripts.schemas import ListingSearchInput
 
 
 class TestNormalization(unittest.TestCase):
@@ -52,6 +54,17 @@ class TestNormalization(unittest.TestCase):
         lower, upper = parse_area_range("30")
         self.assertEqual(lower, 99.17)
         self.assertEqual(upper, 99.17)
+
+    def test_build_listing_search_params_with_separate_area_bounds(self) -> None:
+        params = build_listing_search_params(
+            ListingSearchInput(
+                real_estate_type="APT",
+                area_range={"minimum": "30평", "maximum": "40평"},
+            )
+        )
+
+        self.assertEqual(params["areaMin"], 99.17)
+        self.assertEqual(params["areaMax"], 132.23)
 
 
 if __name__ == "__main__":

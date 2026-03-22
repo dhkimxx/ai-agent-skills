@@ -78,7 +78,7 @@ def _extract_numbers(text: str) -> list[float]:
 
 
 def _contains_range_separator(text: str) -> bool:
-    return any(separator in text for separator in ["~", "-", ",", " "])
+    return any(separator in text for separator in ["~", "-", ","])
 
 
 def _detect_unit(text: str) -> str:

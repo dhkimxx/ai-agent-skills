@@ -9,8 +9,9 @@ from ..schemas import (
     NormalizedArticle,
     RawArticleDetail,
 )
+from .article_payload import flatten_article_payload
 from .contracts import NaverLandRepository
-from .errors import ServiceError
+from .errors import ServiceError, build_service_error
 
 
 class ComparisonService:
@@ -53,7 +54,8 @@ class ComparisonService:
                 sources=sources,
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 공통 에러로 변환한다.
-            raise ServiceError(
+            raise build_service_error(
+                exc,
                 error_code="COMPARISON_FAILED",
                 message="매물 비교에 실패했습니다.",
                 details={"article_nos": article_nos},
@@ -61,7 +63,7 @@ class ComparisonService:
 
 
 def _normalize_article_detail(payload: dict) -> NormalizedArticle:
-    parsed = RawArticleDetail.model_validate(payload)
+    parsed = RawArticleDetail.model_validate(flatten_article_payload(payload))
     return NormalizedArticle(
         article_no=parsed.article_no,
         complex_no=parsed.complex_no,

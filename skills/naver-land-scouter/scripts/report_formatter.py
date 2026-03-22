@@ -113,7 +113,7 @@ def _build_listing_table(result: ListingResult) -> List[str]:
                 name=item.article_name or "-",
                 trade=item.trade_type or "-",
                 price=_format_price(item.price),
-                area=_format_area(item.exclusive_area or item.area),
+                area=_format_article_area(item),
                 floor=_format_floor_direction(item),
             )
         )
@@ -135,7 +135,7 @@ def _build_comparison_table(result: ComparisonResult) -> List[str]:
                 name=item.article.article_name or "-",
                 score=_format_score(item.score),
                 price=_format_price(item.article.price),
-                area=_format_area(item.article.exclusive_area or item.article.area),
+                area=_format_article_area(item.article),
                 reason=item.score_reason or "-",
             )
         )
@@ -266,6 +266,17 @@ def _format_area(value: Optional[float]) -> str:
         return "-"
     pyeong = value / PYEONG_TO_SQUARE_METER
     return f"{value:.1f}㎡ ({pyeong:.1f}평)"
+
+
+def _format_article_area(article: NormalizedArticle) -> str:
+    supply_area = article.supply_area or article.area
+    exclusive_area = article.exclusive_area
+
+    if supply_area is not None and exclusive_area is not None:
+        if round(supply_area, 2) != round(exclusive_area, 2):
+            return f"공급 {_format_area(supply_area)} / 전용 {_format_area(exclusive_area)}"
+
+    return _format_area(exclusive_area or supply_area)
 
 
 def _format_percentage(value: Optional[float]) -> str:
