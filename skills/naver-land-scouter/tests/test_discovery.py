@@ -21,6 +21,10 @@ class FakeDiscoveryRepository:
                     "markerType": "COMPLEX",
                     "complexName": "세종그랑시아",
                     "realEstateTypeCode": "APT",
+                    "lat": 37.270736,
+                    "lon": 127.076797,
+                    "sectionName": "금곡동",
+                    "address": "경기도 수원시 권선구 금곡동 111",
                     "medianDealPrice": 67000,
                     "representativeArea": 165.0,
                     "dealCount": 17,
@@ -76,6 +80,11 @@ class TestDiscovery(unittest.TestCase):
         self.assertEqual(result.items[0].article_name, "세종그랑시아")
         self.assertEqual(result.items[0].price, 67000)
         self.assertEqual(result.items[0].exclusive_area, 165.0)
+        self.assertEqual(result.items[0].dong_name, "금곡동")
+        self.assertEqual(result.items[0].latitude, 37.270736)
+        self.assertEqual(result.items[0].longitude, 127.076797)
+        self.assertEqual(result.items[0].address, "경기도 수원시 권선구 금곡동 111")
+        self.assertGreater(result.items[0].distance_meters or 0, 0)
         self.assertIn("총 23건", result.items[0].article_feature_description or "")
         self.assertEqual(repository.marker_params["tradeType"], "")
 

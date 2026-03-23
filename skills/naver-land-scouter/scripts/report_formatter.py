@@ -42,6 +42,11 @@ def format_hybrid_report(payload: HybridReportPayload) -> str:
     return "\n".join(sections)
 
 
+def format_json_report(payload: HybridReportPayload) -> str:
+    json_payload = _build_json_payload(payload)
+    return json.dumps(json_payload, ensure_ascii=False, indent=2)
+
+
 def _build_summary(payload: HybridReportPayload) -> List[str]:
     summary = [
         f"- 워크플로우: {payload.workflow}",
@@ -103,23 +108,25 @@ def _build_details(payload: HybridReportPayload) -> List[str]:
 
 
 def _build_listing_table(result: ListingResult) -> List[str]:
-    header = "| 매물명 | 거래 | 가격(만원) | 면적 | 층/향 |"
-    separator = "| --- | --- | --- | --- | --- |"
+    header = "| 매물명 | 거래 | 가격(만원) | 면적 | 위치 | 거리 | 층/향 |"
+    separator = "| --- | --- | --- | --- | --- | --- | --- |"
     rows = [header, separator]
 
     for item in result.items:
         rows.append(
-            "| {name} | {trade} | {price} | {area} | {floor} |".format(
+            "| {name} | {trade} | {price} | {area} | {location} | {distance} | {floor} |".format(
                 name=item.article_name or "-",
                 trade=item.trade_type or "-",
                 price=_format_price(item.price),
                 area=_format_article_area(item),
+                location=_format_location(item),
+                distance=_format_distance(item.distance_meters),
                 floor=_format_floor_direction(item),
             )
         )
 
     if len(rows) == 2:
-        rows.append("| 데이터 | 없음 | - | - | - |")
+        rows.append("| 데이터 | 없음 | - | - | - | - | - |")
 
     return rows
 
@@ -207,6 +214,9 @@ def _build_complex_details(report: ComplexReport) -> List[str]:
 def _build_listing_details(result: ListingResult) -> List[str]:
     details: List[str] = []
     for item in result.items[:5]:
+        location_summary = _format_location_detail(item)
+        if location_summary:
+            details.append(f"- {item.article_name or item.article_no} 위치: {location_summary}")
         if item.article_feature_description:
             details.append(
                 f"- {item.article_name or item.article_no}: {item.article_feature_description}"
@@ -215,9 +225,7 @@ def _build_listing_details(result: ListingResult) -> List[str]:
 
 
 def _build_json_block(payload: HybridReportPayload) -> str:
-    json_payload = payload.model_dump(by_alias=True, exclude_none=True)
-    json_payload.setdefault("generatedAt", _utc_now())
-    pretty = json.dumps(json_payload, ensure_ascii=False, indent=2)
+    pretty = format_json_report(payload)
 
     # 상세 내용은 접어두고 필요할 때만 펼칠 수 있게 한다.
     return (
@@ -228,6 +236,12 @@ def _build_json_block(payload: HybridReportPayload) -> str:
         "```\n"
         "</details>"
     )
+
+
+def _build_json_payload(payload: HybridReportPayload) -> dict:
+    json_payload = payload.model_dump(by_alias=True, exclude_none=True)
+    json_payload.setdefault("generatedAt", _utc_now())
+    return json_payload
 
 
 def _format_complex_title(complex_info: Optional[NormalizedComplex]) -> str:
@@ -242,6 +256,39 @@ def _format_floor_direction(article: NormalizedArticle) -> str:
     floor = article.floor_info or "-"
     direction = article.direction or "-"
     return f"{floor} / {direction}"
+
+
+def _format_location(article: NormalizedArticle) -> str:
+    location_parts: List[str] = []
+    if article.dong_name:
+        location_parts.append(article.dong_name)
+    elif article.address:
+        location_parts.append(article.address)
+
+    if article.latitude is not None and article.longitude is not None:
+        location_parts.append(f"{article.latitude:.6f}, {article.longitude:.6f}")
+
+    if not location_parts:
+        return "-"
+    return " / ".join(location_parts)
+
+
+def _format_location_detail(article: NormalizedArticle) -> Optional[str]:
+    details: List[str] = []
+    if article.address:
+        details.append(article.address)
+    elif article.dong_name:
+        details.append(article.dong_name)
+
+    if article.latitude is not None and article.longitude is not None:
+        details.append(f"좌표 {article.latitude:.6f}, {article.longitude:.6f}")
+
+    if article.distance_meters is not None:
+        details.append(f"기준점 거리 {_format_distance(article.distance_meters)}")
+
+    if not details:
+        return None
+    return ", ".join(details)
 
 
 def _format_price(value: Optional[int], raw: bool = False) -> str:
@@ -328,3 +375,9 @@ def _format_timestamp(value: Optional[str]) -> str:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _format_distance(value: Optional[int]) -> str:
+    if value is None:
+        return "-"
+    return f"{value:,}m"

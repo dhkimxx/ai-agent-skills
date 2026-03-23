@@ -55,9 +55,12 @@ class ListingSearchInput(NaverLandBaseModel):
     price_range: Optional[PriceRange] = None
     rent_price_range: Optional[PriceRange] = None
     area_range: Optional[AreaRange] = None
+    exclusive_area_range: Optional[AreaRange] = None
     directions: Optional[List[str]] = None
     order: Optional[str] = None
     page: Optional[int] = None
+    center_lat: Optional[float] = None
+    center_lon: Optional[float] = None
 
 
 class ComplexAnalysisInput(NaverLandBaseModel):
@@ -89,6 +92,23 @@ class RawComplexOverview(NaverLandBaseModel):
         default=None,
         validation_alias=AliasChoices("address", "roadAddress", "roadAddressName"),
     )
+    dong_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "dongName",
+            "cortarName",
+            "divisionName",
+            "sectionName",
+        ),
+    )
+    latitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lat", "latitude", "centerLat"),
+    )
+    longitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lon", "longitude", "centerLon"),
+    )
     total_household_count: Optional[int] = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -108,6 +128,23 @@ class RawComplexDetail(NaverLandBaseModel):
         default=None, validation_alias=AliasChoices("complexName", "complexNm")
     )
     address: Optional[str] = Field(default=None, validation_alias=AliasChoices("address"))
+    dong_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "dongName",
+            "cortarName",
+            "divisionName",
+            "sectionName",
+        ),
+    )
+    latitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lat", "latitude", "centerLat"),
+    )
+    longitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lon", "longitude", "centerLon"),
+    )
     total_household_count: Optional[int] = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -156,6 +193,27 @@ class RawArticleSummary(NaverLandBaseModel):
     )
     floor_info: Optional[str] = Field(default=None, validation_alias=AliasChoices("floorInfo"))
     direction: Optional[str] = None
+    address: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("address", "jibunAddress", "roadAddress"),
+    )
+    dong_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "dongName",
+            "cortarName",
+            "divisionName",
+            "sectionName",
+        ),
+    )
+    latitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lat", "latitude", "mapLat", "centerLat"),
+    )
+    longitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lon", "longitude", "lng", "mapLon", "centerLon"),
+    )
     article_feature_description: Optional[str] = Field(
         default=None, alias="atclFetrDesc"
     )
@@ -197,12 +255,36 @@ class RawNeighborhoodInfo(NaverLandBaseModel):
 
 
 class RawComplexMarker(NaverLandBaseModel):
+    complex_no: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("complexNo", "markerId")
+    )
     marker_id: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("markerId", "complexNo")
     )
     marker_type: Optional[str] = Field(default=None, validation_alias=AliasChoices("markerType"))
     complex_name: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("complexName", "name")
+    )
+    address: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("address", "jibunAddress", "roadAddress"),
+    )
+    dong_name: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "dongName",
+            "cortarName",
+            "divisionName",
+            "sectionName",
+        ),
+    )
+    latitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lat", "latitude", "centerLat"),
+    )
+    longitude: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("lon", "longitude", "centerLon"),
     )
     real_estate_type_code: Optional[str] = Field(
         default=None,
@@ -262,6 +344,11 @@ class NormalizedArticle(NaverLandBaseModel):
     supply_area: Optional[float] = None
     floor_info: Optional[str] = None
     direction: Optional[str] = None
+    address: Optional[str] = None
+    dong_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    distance_meters: Optional[int] = None
     article_feature_description: Optional[str] = None
 
 
@@ -269,6 +356,9 @@ class NormalizedComplex(NaverLandBaseModel):
     complex_no: Optional[str] = None
     complex_name: Optional[str] = None
     address: Optional[str] = None
+    dong_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     total_household_count: Optional[int] = None
     completion_year: Optional[int] = None
 

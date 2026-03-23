@@ -130,6 +130,9 @@ def _merge_complex_models(
         complex_no=detail.complex_no or overview.complex_no,
         complex_name=detail.complex_name or overview.complex_name,
         address=detail.address or overview.address,
+        dong_name=detail.dong_name or overview.dong_name,
+        latitude=detail.latitude or overview.latitude,
+        longitude=detail.longitude or overview.longitude,
         total_household_count=detail.total_household_count
         or overview.total_household_count,
         completion_year=overview.completion_year,

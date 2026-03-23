@@ -182,30 +182,41 @@ def _build_price_range_params(price_range: PriceRange, prefix: str) -> Dict[str,
 def _build_area_range_params(
     minimum: Optional[float | str], maximum: Optional[float | str]
 ) -> Dict[str, Any]:
+    area_min, area_max = resolve_area_range_bounds(minimum, maximum)
+    return _filter_empty_params({"areaMin": area_min, "areaMax": area_max})
+
+
+def resolve_area_range_bounds(
+    minimum: Optional[float | str], maximum: Optional[float | str]
+) -> tuple[Optional[float], Optional[float]]:
     parsed_min = parse_area_range_expression(minimum)
     if parsed_min:
-        return _filter_empty_params({"areaMin": parsed_min[0], "areaMax": parsed_min[1]})
+        return parsed_min[0], parsed_min[1]
 
     parsed_max = parse_area_range_expression(maximum)
     if parsed_max:
-        return _filter_empty_params({"areaMin": parsed_max[0], "areaMax": parsed_max[1]})
+        return parsed_max[0], parsed_max[1]
 
-    if isinstance(minimum, str) and maximum is None:
-        parsed_single = parse_area_range(minimum)
-        if parsed_single:
-            return _filter_empty_params({"areaMin": parsed_single[0], "areaMax": parsed_single[1]})
+    parsed_single_min = _parse_single_area_bound(minimum)
+    parsed_single_max = _parse_single_area_bound(maximum)
 
-    if isinstance(maximum, str) and minimum is None:
-        parsed_single = parse_area_range(maximum)
-        if parsed_single:
-            return _filter_empty_params({"areaMin": parsed_single[0], "areaMax": parsed_single[1]})
+    area_min = parsed_single_min[0] if parsed_single_min else None
+    area_max = parsed_single_max[1] if parsed_single_max else None
+    return area_min, area_max
 
-    return _filter_empty_params(
-        {
-            "areaMin": normalize_area_to_square_meter(minimum),
-            "areaMax": normalize_area_to_square_meter(maximum),
-        }
-    )
+
+def _parse_single_area_bound(
+    value: Optional[float | str],
+) -> Optional[tuple[float, float]]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return parse_area_range(value)
+
+    normalized = normalize_area_to_square_meter(value)
+    if normalized is None:
+        return None
+    return normalized, normalized
 
 
 def _join_filter_values(values: Optional[Iterable[str]]) -> Optional[str]:

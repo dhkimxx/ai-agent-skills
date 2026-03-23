@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Any, List, Optional
 
+from ..location_utils import calculate_distance_meters, infer_dong_name, pick_first_text
 from ..normalization import normalize_area_to_square_meter, normalize_price_to_manwon
 from ..param_builder import build_cortars_params, build_marker_params
 from ..schemas import BoundingBox, ListingResult, NormalizedArticle, RawComplexMarker
@@ -42,7 +44,11 @@ class DiscoveryService:
                 marker_params
             )
 
-            listing_result = _extract_listing_from_markers(marker_payload)
+            listing_result = _extract_listing_from_markers(
+                marker_payload,
+                center_lat=center_lat,
+                center_lon=center_lon,
+            )
             listing_result.sources.extend([cortars_context, marker_context])
             return listing_result
         except ServiceError:
@@ -82,7 +88,11 @@ def _extract_cortar_no(payload: Any) -> str:
     )
 
 
-def _extract_listing_from_markers(payload: Any) -> ListingResult:
+def _extract_listing_from_markers(
+    payload: Any,
+    center_lat: Optional[float] = None,
+    center_lon: Optional[float] = None,
+) -> ListingResult:
     if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
         error = payload.get("error") or {}
         raise ServiceError(
@@ -96,15 +106,19 @@ def _extract_listing_from_markers(payload: Any) -> ListingResult:
         for key in ["markers", "complexes", "list", "result"]:
             value = payload.get(key)
             if isinstance(value, list):
-                items.extend(_extract_marker_items(value))
+                items.extend(_extract_marker_items(value, center_lat, center_lon))
                 break
     elif isinstance(payload, list):
-        items.extend(_extract_marker_items(payload))
+        items.extend(_extract_marker_items(payload, center_lat, center_lon))
 
     return ListingResult(query_text="discover", items=items)
 
 
-def _extract_marker_items(raw_items: List[Any]) -> List[NormalizedArticle]:
+def _extract_marker_items(
+    raw_items: List[Any],
+    center_lat: Optional[float] = None,
+    center_lon: Optional[float] = None,
+) -> List[NormalizedArticle]:
     items: List[NormalizedArticle] = []
     for item in raw_items:
         if not isinstance(item, dict):
@@ -116,15 +130,32 @@ def _extract_marker_items(raw_items: List[Any]) -> List[NormalizedArticle]:
             or parsed.max_deal_price
         )
         representative_area = _resolve_representative_area(parsed)
+        address = _resolve_marker_address(item, parsed)
+        dong_name = parsed.dong_name or infer_dong_name(
+            item.get("sectionName"),
+            item.get("divisionName"),
+            item.get("cortarName"),
+            address,
+        )
         items.append(
             NormalizedArticle(
-                complex_no=parsed.marker_id,
+                complex_no=parsed.complex_no or parsed.marker_id,
                 article_name=parsed.complex_name,
                 price=normalize_price_to_manwon(price),
                 trade_type="A1" if (parsed.deal_count or 0) > 0 else None,
                 real_estate_type=parsed.real_estate_type_code,
                 area=representative_area,
                 exclusive_area=representative_area,
+                address=address,
+                dong_name=dong_name,
+                latitude=parsed.latitude,
+                longitude=parsed.longitude,
+                distance_meters=calculate_distance_meters(
+                    center_lat,
+                    center_lon,
+                    parsed.latitude,
+                    parsed.longitude,
+                ),
                 article_feature_description=_build_marker_summary(parsed),
             )
         )
@@ -155,3 +186,25 @@ def _build_marker_summary(marker: RawComplexMarker) -> Optional[str]:
     if not summary_parts:
         return None
     return ", ".join(summary_parts)
+
+
+def _resolve_marker_address(
+    raw_marker: dict,
+    parsed_marker: RawComplexMarker,
+) -> Optional[str]:
+    address = pick_first_text(
+        parsed_marker.address,
+        raw_marker.get("jibunAddress"),
+        raw_marker.get("roadAddress"),
+        raw_marker.get("address"),
+    )
+    if address:
+        return address
+
+    address_parts = [
+        raw_marker.get("cityName"),
+        raw_marker.get("divisionName"),
+        raw_marker.get("sectionName"),
+    ]
+    joined = " ".join(str(part).strip() for part in address_parts if part)
+    return re.sub(r"\s+", " ", joined).strip() or None

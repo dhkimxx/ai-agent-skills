@@ -4,11 +4,12 @@ import argparse
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .naver_land_client import NaverLandApiClient
 from .naver_land_repository import DefaultNaverLandRepository
-from .report_formatter import format_hybrid_report
+from .report_formatter import format_hybrid_report, format_json_report
 from .schemas import (
     BoundingBox,
     ComplexAnalysisInput,
@@ -40,9 +41,13 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--price-max")
     list_parser.add_argument("--area-min")
     list_parser.add_argument("--area-max")
+    list_parser.add_argument("--exclusive-area-min")
+    list_parser.add_argument("--exclusive-area-max")
     list_parser.add_argument("--order", default="rank")
     list_parser.add_argument("--page", type=int, default=1)
     list_parser.add_argument("--directions", nargs="*")
+    list_parser.add_argument("--center-lat", type=float)
+    list_parser.add_argument("--center-lon", type=float)
 
     complex_parser = subparsers.add_parser("complex", help="단지 리포트")
     complex_parser.add_argument("--complex-no", required=True)
@@ -89,6 +94,16 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["auto", "none", "http", "browser"],
         default=None,
         help="세션 부트스트랩 방식 (기본값: auto)",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["hybrid", "json"],
+        default="hybrid",
+        help="출력 형식",
+    )
+    parser.add_argument(
+        "--output-file",
+        help="결과를 저장할 파일 경로",
     )
 
     return parser
@@ -186,7 +201,8 @@ def main() -> None:
             )
 
         payload.generated_at = _utc_now()
-        report = format_hybrid_report(payload)
+        report = _render_report(payload, args.format)
+        _write_output_if_requested(args.output_file, report)
         print(report)
     except ServiceError as exc:
         print(_format_service_error(exc))
@@ -260,6 +276,11 @@ def _split_env_items(raw: str) -> list[str]:
 def _build_listing_input(args: argparse.Namespace) -> ListingSearchInput:
     price_range = _build_price_range(args.price_min, args.price_max)
     area_range = _build_area_range(args.area_min, args.area_max)
+    exclusive_area_range = _build_area_range(
+        args.exclusive_area_min,
+        args.exclusive_area_max,
+    )
+    _validate_center_coordinates(args.center_lat, args.center_lon)
 
     return ListingSearchInput(
         query_text="manual",
@@ -267,9 +288,12 @@ def _build_listing_input(args: argparse.Namespace) -> ListingSearchInput:
         trade_type=args.trade_type,
         price_range=price_range,
         area_range=area_range,
+        exclusive_area_range=exclusive_area_range,
         directions=args.directions,
         order=args.order,
         page=args.page,
+        center_lat=args.center_lat,
+        center_lon=args.center_lon,
     )
 
 
@@ -313,6 +337,28 @@ def _build_bbox(args: argparse.Namespace) -> Optional[BoundingBox]:
     return None
 
 
+def _render_report(payload: HybridReportPayload, output_format: str) -> str:
+    if output_format == "json":
+        return format_json_report(payload)
+    return format_hybrid_report(payload)
+
+
+def _write_output_if_requested(output_file: Optional[str], report: str) -> None:
+    if not output_file:
+        return
+
+    try:
+        output_path = Path(output_file).expanduser()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(_ensure_trailing_newline(report), encoding="utf-8")
+    except OSError as exc:
+        raise ServiceError(
+            error_code="OUTPUT_WRITE_FAILED",
+            message="결과 파일 저장에 실패했습니다.",
+            details={"path": output_file, "reason": str(exc)},
+        ) from exc
+
+
 def _format_service_error(exc: ServiceError) -> str:
     payload = {
         "errorCode": exc.error_code,
@@ -326,6 +372,25 @@ def _utc_now() -> str:
     from datetime import datetime, timezone
 
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _ensure_trailing_newline(value: str) -> str:
+    if value.endswith("\n"):
+        return value
+    return f"{value}\n"
+
+
+def _validate_center_coordinates(
+    center_lat: Optional[float],
+    center_lon: Optional[float],
+) -> None:
+    if center_lat is None and center_lon is None:
+        return
+    if center_lat is None or center_lon is None:
+        raise ServiceError(
+            error_code="CENTER_COORDINATE_INVALID",
+            message="거리 계산을 위해서는 center-lat와 center-lon을 함께 입력해야 합니다.",
+        )
 
 
 if __name__ == "__main__":

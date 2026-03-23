@@ -66,6 +66,17 @@ class TestNormalization(unittest.TestCase):
         self.assertEqual(params["areaMin"], 99.17)
         self.assertEqual(params["areaMax"], 132.23)
 
+    def test_build_listing_search_params_defaults_unitless_bounds_to_pyeong(self) -> None:
+        params = build_listing_search_params(
+            ListingSearchInput(
+                real_estate_type="APT",
+                area_range={"minimum": "30", "maximum": "40"},
+            )
+        )
+
+        self.assertEqual(params["areaMin"], 99.17)
+        self.assertEqual(params["areaMax"], 132.23)
+
 
 if __name__ == "__main__":
     unittest.main()
