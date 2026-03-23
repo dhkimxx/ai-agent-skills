@@ -91,14 +91,19 @@ class ListingService:
         except Exception:  # noqa: BLE001 - 위치 메타데이터는 보조 정보라 조회 실패를 무시한다.
             return {}, None
 
-        parsed = RawComplexDetail.model_validate(payload) if isinstance(payload, dict) else RawComplexDetail()
+        raw_detail = _flatten_complex_detail_payload(payload)
+        parsed = (
+            RawComplexDetail.model_validate(raw_detail)
+            if raw_detail
+            else RawComplexDetail()
+        )
         return (
             {
-                "address": _resolve_address_text(payload if isinstance(payload, dict) else {}, parsed.address),
+                "address": _resolve_address_text(raw_detail, parsed.address),
                 "dong_name": parsed.dong_name
                 or infer_dong_name(
-                    payload.get("sectionName") if isinstance(payload, dict) else None,
-                    payload.get("divisionName") if isinstance(payload, dict) else None,
+                    raw_detail.get("sectionName"),
+                    raw_detail.get("divisionName"),
                     parsed.address,
                 ),
                 "latitude": parsed.latitude,
@@ -238,3 +243,18 @@ def _resolve_address_text(raw: dict, fallback: Optional[str]) -> Optional[str]:
     ]
     joined = " ".join(str(part).strip() for part in address_parts if part)
     return re.sub(r"\s+", " ", joined).strip() or None
+
+
+def _flatten_complex_detail_payload(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+
+    detail = payload.get("complexDetail")
+    if not isinstance(detail, dict):
+        return payload
+
+    # 단지 상세 API는 핵심 필드를 complexDetail 아래에 중첩해 보내는 경우가 많다.
+    # fallback 위치 정보는 단일 평면 구조가 다루기 쉬워 여기서 합친다.
+    flattened = dict(payload)
+    flattened.update(detail)
+    return flattened

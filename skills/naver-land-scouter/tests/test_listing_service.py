@@ -50,6 +50,22 @@ class FakeListingRepository:
         )
 
 
+class NestedComplexDetailRepository(FakeListingRepository):
+    def fetch_complex_detail(self, complex_no, params=None):
+        return (
+            {
+                "complexDetail": {
+                    "complexNo": complex_no,
+                    "address": "경기도 용인시 기흥구 구갈동 456",
+                    "sectionName": "구갈동",
+                    "lat": 37.275816,
+                    "lon": 127.111997,
+                }
+            },
+            ApiRequestContext(endpoint="/api/complexes/123"),
+        )
+
+
 class TestListingService(unittest.TestCase):
     def test_listing_service_applies_exclusive_area_filter_and_location_fallback(self) -> None:
         service = ListingService(FakeListingRepository())
@@ -77,6 +93,24 @@ class TestListingService(unittest.TestCase):
         self.assertEqual(result.filter_stats.before_count, 2)
         self.assertEqual(result.filter_stats.after_count, 1)
         self.assertEqual(result.filter_stats.drop_reasons[0].filter_name, "exclusive_area_range")
+
+    def test_listing_service_reads_nested_complex_detail_location_fallback(self) -> None:
+        service = ListingService(NestedComplexDetailRepository())
+
+        result = service.search_by_complex(
+            "123",
+            ListingSearchInput(
+                query_text="manual",
+                real_estate_type="APT",
+                trade_type="A1",
+            ),
+        )
+
+        self.assertEqual(len(result.items), 2)
+        self.assertEqual(result.items[0].address, "경기도 용인시 기흥구 구갈동 456")
+        self.assertEqual(result.items[0].dong_name, "구갈동")
+        self.assertEqual(result.items[0].latitude, 37.275816)
+        self.assertEqual(result.items[0].longitude, 127.111997)
 
 
 if __name__ == "__main__":
