@@ -20,6 +20,7 @@ from .schemas import (
     SearchResult,
     NormalizedSchool,
     NormalizedTransport,
+    WorkflowResult,
 )
 
 
@@ -84,6 +85,15 @@ def _build_summary(payload: HybridReportPayload) -> List[str]:
     if payload.scan_result:
         summary.append(f"- 스캔 대상: {len(payload.scan_result.targets)}곳")
         summary.append(f"- 통합 결과: {len(payload.scan_result.items)}건")
+    if payload.workflow_result:
+        summary.append(f"- 시도 횟수: {len(payload.workflow_result.attempts)}회")
+        summary.append(f"- 추천 결과: {len(payload.workflow_result.recommended_items)}건")
+        summary.append(
+            f"- History 보강: {sum(1 for item in payload.workflow_result.recommended_items if item.premium_summary is not None)}건"
+        )
+        if payload.workflow_result.final_radius_meters is not None:
+            summary.append(f"- 최종 반경: {payload.workflow_result.final_radius_meters}m")
+        summary.append(f"- 상태: {payload.workflow_result.completion_status}")
 
     if payload.complex_report:
         complex_summary = _format_complex_title(payload.complex_report.complex)
@@ -117,6 +127,8 @@ def _build_table(payload: HybridReportPayload) -> List[str]:
         return _build_comparison_table(payload.comparison_result)
     if payload.search_result:
         return _build_search_table(payload.search_result)
+    if payload.workflow_result:
+        return _build_workflow_table(payload.workflow_result)
     if payload.scan_result:
         return _build_scan_table(payload.scan_result)
     if payload.listing_result:
@@ -148,6 +160,8 @@ def _build_details(payload: HybridReportPayload) -> List[str]:
 
     if payload.scan_result:
         details.extend(_build_scan_details(payload.scan_result))
+    if payload.workflow_result:
+        details.extend(_build_workflow_details(payload.workflow_result))
 
     if payload.comparison_result and payload.comparison_result.recommendation:
         details.append(f"- 추천 사유: {payload.comparison_result.recommendation}")
@@ -409,6 +423,74 @@ def _build_scan_details(result: ScanResult) -> List[str]:
                 distance=_format_distance(item.distance_meters),
             )
         )
+    return details
+
+
+def _build_workflow_table(result: WorkflowResult) -> List[str]:
+    if len(result.recommended_items) == 0:
+        rows = ["| 단계 | 값 |", "| --- | --- |"]
+        rows.append(f"| 상태 | {result.completion_status} |")
+        rows.append(
+            f"| 최종 반경 | {result.final_radius_meters if result.final_radius_meters is not None else '-'}m |"
+        )
+        return rows
+
+    header = "| 순위 | 매물명 | 가격(만원) | 면적 | 거리 | Premium | 판단 |"
+    separator = "| --- | --- | --- | --- | --- | --- | --- |"
+    rows = [header, separator]
+
+    for item in result.recommended_items:
+        premium_summary = item.premium_summary
+        rows.append(
+            "| {rank} | {name} | {price} | {area} | {distance} | {premium} | {judgement} |".format(
+                rank=item.rank,
+                name=item.article_name or item.article_no or "-",
+                price=_format_price(item.price),
+                area=_format_article_area(item),
+                distance=_format_distance(item.distance_meters),
+                premium=_format_price(
+                    premium_summary.premium_amount if premium_summary else None
+                ),
+                judgement=premium_summary.judgement if premium_summary else "-",
+            )
+        )
+    return rows
+
+
+def _build_workflow_details(result: WorkflowResult) -> List[str]:
+    details: List[str] = []
+    if result.selected_reason:
+        details.append(f"- 선택 근거: {result.selected_reason}")
+    for attempt in result.attempts:
+        details.append(
+            "- 시도 {radius}m / 단계 {stage}: 상태 {status}, 결과 {count}건, 실패 타겟 {failed}건".format(
+                radius=attempt.radius_meters,
+                stage=attempt.relaxation_stage,
+                status=attempt.completion_status,
+                count=attempt.item_count,
+                failed=attempt.failed_target_count,
+            )
+        )
+        if attempt.applied_filters:
+            details.append("- 적용 조건: " + ", ".join(attempt.applied_filters))
+        for note in attempt.notes:
+            details.append(f"- 시도 메모: {note}")
+    for item in result.recommended_items:
+        if item.premium_summary is None:
+            continue
+        details.append(
+            "- 추천 {rank}위 {name}: Premium {amount} ({rate}) / 판단 {judgement}".format(
+                rank=item.rank,
+                name=item.article_name or item.article_no or "-",
+                amount=_format_price(item.premium_summary.premium_amount),
+                rate=_format_percentage(item.premium_summary.premium_rate),
+                judgement=item.premium_summary.judgement or "-",
+            )
+        )
+    for warning_message in result.warnings[:5]:
+        details.append(f"- 경고: {warning_message}")
+    for next_action in result.next_actions:
+        details.append(f"- 다음 행동: {next_action}")
     return details
 
 

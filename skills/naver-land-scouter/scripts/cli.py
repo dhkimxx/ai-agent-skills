@@ -28,6 +28,7 @@ from .services import (
     LocationService,
     ScanService,
     ServiceError,
+    WorkflowService,
 )
 from .location_utils import build_bounding_box_from_radius, parse_radius_to_meters
 
@@ -67,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     search_parser = subparsers.add_parser("search", help="위치/단지 검색")
     search_parser.add_argument("query_text")
+    search_parser.add_argument("--region-hint")
     search_parser.add_argument("--radius", default="700m")
     search_parser.add_argument("--real-estate-type", default="APT")
     search_parser.add_argument(
@@ -77,6 +79,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     discover_parser = subparsers.add_parser("discover", help="지도 기반 탐색")
     discover_parser.add_argument("--near")
+    discover_parser.add_argument("--region-hint")
     discover_parser.add_argument("--radius", default="500m")
     discover_parser.add_argument("--center-lat", type=float)
     discover_parser.add_argument("--center-lon", type=float)
@@ -96,6 +99,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan_parser = subparsers.add_parser("scan", help="여러 위치 통합 검색")
     scan_parser.add_argument("--near", action="append", required=True)
+    scan_parser.add_argument("--region-hint")
     scan_parser.add_argument("--radius", default="500m")
     scan_parser.add_argument("--real-estate-type", required=True)
     scan_parser.add_argument("--complex-limit", type=int, default=12)
@@ -105,6 +109,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
     )
     _add_listing_filter_arguments(scan_parser, include_real_estate_type=False)
+
+    workflow_parser = subparsers.add_parser("workflow", help="에이전트 친화 통합 워크플로우")
+    workflow_parser.add_argument("--near", action="append", required=True)
+    workflow_parser.add_argument("--region-hint")
+    workflow_parser.add_argument("--radius", default="500m")
+    workflow_parser.add_argument("--fallback-radius", action="append", default=[])
+    workflow_parser.add_argument("--real-estate-type", required=True)
+    workflow_parser.add_argument("--complex-limit", type=int, default=12)
+    workflow_parser.add_argument("--recommend-limit", type=int, default=5)
+    workflow_parser.add_argument("--history-limit", type=int, default=3)
+    workflow_parser.add_argument(
+        "--enrich",
+        choices=["complex-summary"],
+        default=None,
+    )
+    _add_listing_filter_arguments(workflow_parser, include_real_estate_type=False)
 
     parser.add_argument(
         "--header",
@@ -216,6 +236,7 @@ def main() -> None:
                 radius_meters=parse_radius_to_meters(args.radius),
                 real_estate_type=args.real_estate_type,
                 enrich_mode=args.enrich,
+                region_hint=args.region_hint,
             )
             payload = HybridReportPayload(
                 workflow="search",
@@ -253,10 +274,31 @@ def main() -> None:
                 enrich_mode=args.enrich,
                 complex_limit=args.complex_limit,
                 expand_articles=_should_expand_scan_articles(args),
+                region_hint=args.region_hint,
             )
             payload = HybridReportPayload(
                 workflow="scan",
                 scan_result=scan_result,
+            )
+        elif args.command == "workflow":
+            service = WorkflowService(repository)
+            listing_input = _build_listing_input(args)
+            workflow_result = service.run_listing_workflow(
+                near_queries=args.near,
+                radius_meters=parse_radius_to_meters(args.radius),
+                real_estate_type=args.real_estate_type,
+                listing_input=listing_input,
+                region_hint=args.region_hint,
+                enrich_mode=args.enrich,
+                complex_limit=args.complex_limit,
+                expand_articles=_should_expand_scan_articles(args),
+                fallback_radius_meters=_parse_radius_values(args.fallback_radius),
+                recommend_limit=args.recommend_limit,
+                history_enrich_limit=args.history_limit,
+            )
+            payload = HybridReportPayload(
+                workflow="workflow",
+                workflow_result=workflow_result,
             )
         else:
             raise ServiceError(
@@ -396,6 +438,10 @@ def _build_area_range(area_min: Optional[str], area_max: Optional[str]) -> Optio
     return {"minimum": area_min, "maximum": area_max}
 
 
+def _parse_radius_values(radius_values: list[str]) -> list[int]:
+    return [parse_radius_to_meters(radius_value) for radius_value in radius_values]
+
+
 def _build_bbox(args: argparse.Namespace) -> Optional[BoundingBox]:
     bbox = getattr(args, "bbox", None)
     if bbox:
@@ -429,7 +475,10 @@ def _resolve_discover_request(
     location_service: LocationService,
 ) -> tuple[float, float, int, BoundingBox]:
     if getattr(args, "near", None):
-        resolved = location_service.resolve_single_location(args.near)
+        resolved = location_service.resolve_single_location(
+            args.near,
+            region_hint=getattr(args, "region_hint", None),
+        )
         radius_meters = parse_radius_to_meters(args.radius)
         return (
             resolved.latitude,
@@ -519,9 +568,24 @@ def _build_output_notice(
     if payload.search_result:
         summary["candidateCount"] = len(payload.search_result.candidates)
         summary["nearbyComplexCount"] = len(payload.search_result.nearby_complexes)
+        summary["warningCount"] = len(payload.search_result.warnings)
     if payload.scan_result:
         summary["targetCount"] = len(payload.scan_result.targets)
         summary["itemCount"] = len(payload.scan_result.items)
+        summary["failedTargetCount"] = sum(
+            1 for target in payload.scan_result.targets if target.status == "failed"
+        )
+        summary["warningCount"] = len(payload.scan_result.warnings)
+    if payload.workflow_result:
+        summary["attemptCount"] = len(payload.workflow_result.attempts)
+        summary["recommendedCount"] = len(payload.workflow_result.recommended_items)
+        summary["finalRadiusMeters"] = payload.workflow_result.final_radius_meters
+        summary["historyEnrichedCount"] = sum(
+            1
+            for item in payload.workflow_result.recommended_items
+            if item.premium_summary is not None
+        )
+        summary["warningCount"] = len(payload.workflow_result.warnings)
     if payload.history_result:
         summary["tradePointCount"] = len(payload.history_result.trade_points)
     return json.dumps(summary, ensure_ascii=False, indent=2)

@@ -484,11 +484,20 @@ class ResolvedLocation(NaverLandBaseModel):
     cortar_no: Optional[str] = None
     address: Optional[str] = None
     match_type: Optional[str] = None
+    location_type: Optional[str] = None
+    score: Optional[int] = None
 
 
 class SearchResult(NaverLandBaseModel):
     query_text: Optional[str] = None
+    query_intent: Optional[str] = None
+    region_hint: Optional[str] = None
+    resolution_strategy: Optional[str] = None
     candidates: List[ResolvedLocation] = Field(default_factory=list)
+    preferred_candidate: Optional[ResolvedLocation] = None
+    alternatives: List[ResolvedLocation] = Field(default_factory=list)
+    ambiguity_reason: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
     complexes: List[NormalizedComplex] = Field(default_factory=list)
     nearby_complexes: List[NormalizedArticle] = Field(default_factory=list)
     sources: List[ApiRequestContext] = Field(default_factory=list)
@@ -496,16 +505,22 @@ class SearchResult(NaverLandBaseModel):
 
 class ScanTargetResult(NaverLandBaseModel):
     query_text: Optional[str] = None
+    status: Optional[str] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    resolution_strategy: Optional[str] = None
     resolved_location: Optional[ResolvedLocation] = None
     complexes: List[NormalizedArticle] = Field(default_factory=list)
     articles: List[NormalizedArticle] = Field(default_factory=list)
     filter_stats: Optional[FilterStats] = None
+    warnings: List[str] = Field(default_factory=list)
 
 
 class ScanResult(NaverLandBaseModel):
     targets: List[ScanTargetResult] = Field(default_factory=list)
     items: List[NormalizedArticle] = Field(default_factory=list)
     filter_stats: Optional[FilterStats] = None
+    warnings: List[str] = Field(default_factory=list)
     sources: List[ApiRequestContext] = Field(default_factory=list)
 
 
@@ -611,12 +626,56 @@ class HistoryResult(NaverLandBaseModel):
     sources: List[ApiRequestContext] = Field(default_factory=list)
 
 
+class WorkflowRequest(NaverLandBaseModel):
+    near_queries: List[str] = Field(default_factory=list)
+    region_hint: Optional[str] = None
+    real_estate_type: Optional[str] = None
+    radius_meters: int = 500
+    fallback_radius_meters: List[int] = Field(default_factory=list)
+    complex_limit: int = 12
+    expand_articles: bool = False
+    history_enrich_limit: int = 0
+    listing_input: Optional[ListingSearchInput] = None
+
+
+class WorkflowAttemptSummary(NaverLandBaseModel):
+    radius_meters: int
+    relaxation_stage: str = "initial"
+    completion_status: str
+    item_count: int = 0
+    target_count: int = 0
+    failed_target_count: int = 0
+    warning_count: int = 0
+    selected: bool = False
+    applied_filters: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
+class WorkflowRecommendedItem(NormalizedArticle):
+    rank: int
+    premium_summary: Optional[PremiumSummary] = None
+
+
+class WorkflowResult(NaverLandBaseModel):
+    request: WorkflowRequest
+    completion_status: str
+    attempts: List[WorkflowAttemptSummary] = Field(default_factory=list)
+    final_radius_meters: Optional[int] = None
+    selected_reason: Optional[str] = None
+    scan_result: Optional[ScanResult] = None
+    recommended_items: List[WorkflowRecommendedItem] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    next_actions: List[str] = Field(default_factory=list)
+    sources: List[ApiRequestContext] = Field(default_factory=list)
+
+
 class HybridReportPayload(NaverLandBaseModel):
     workflow: str
     listing_result: Optional[ListingResult] = None
     discovery_result: Optional[ListingResult] = None
     search_result: Optional[SearchResult] = None
     scan_result: Optional[ScanResult] = None
+    workflow_result: Optional[WorkflowResult] = None
     complex_report: Optional[ComplexReport] = None
     comparison_result: Optional[ComparisonResult] = None
     investment_indicator_result: Optional[InvestmentIndicatorResult] = None

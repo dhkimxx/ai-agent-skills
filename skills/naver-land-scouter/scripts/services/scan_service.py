@@ -14,7 +14,7 @@ from ..schemas import (
 )
 from .contracts import NaverLandRepository
 from .discovery_service import DiscoveryService
-from .errors import build_service_error
+from .errors import ServiceError, build_service_error
 from .listing_service import ListingService
 from .location_service import LocationService
 
@@ -32,6 +32,7 @@ class ScanService:
         enrich_mode: Optional[str] = None,
         complex_limit: int = 12,
         expand_articles: bool = False,
+        region_hint: Optional[str] = None,
     ) -> ScanResult:
         try:
             location_service = LocationService(self._repository)
@@ -45,30 +46,80 @@ class ScanService:
             per_filter_after = 0
             drop_reason_counts: dict[str, int] = defaultdict(int)
             drop_reason_descriptions: dict[str, str] = {}
+            warnings: List[str] = []
 
             for query_text in near_queries:
-                resolved = location_service.resolve_single_location(query_text)
-                bbox = build_bounding_box_from_radius(
-                    resolved.latitude,
-                    resolved.longitude,
-                    radius_meters,
-                )
-                discovered = discovery_service.discover_by_map(
-                    center_lat=resolved.latitude,
-                    center_lon=resolved.longitude,
-                    zoom=resolved.zoom or 16,
-                    bounding_box=bbox,
-                    real_estate_type=real_estate_type,
-                    enrich_mode=enrich_mode,
-                    radius_meters=radius_meters,
-                )
-                aggregated_sources.extend(discovered.sources)
-
                 target_result = ScanTargetResult(
                     query_text=query_text,
-                    resolved_location=resolved,
-                    complexes=discovered.items,
+                    status="pending",
                 )
+                try:
+                    resolution_bundle = location_service.resolve_location_bundle(
+                        query_text,
+                        region_hint=region_hint,
+                    )
+                    aggregated_sources.extend(resolution_bundle.sources)
+                    decision = resolution_bundle.decision
+                    if decision.preferred_candidate is None:
+                        raise ServiceError(
+                            error_code="LOCATION_AMBIGUOUS",
+                            message="검색어가 여러 위치로 해석됩니다. 더 구체적으로 입력하세요.",
+                            details={
+                                "query_text": query_text,
+                                "query_intent": decision.query_intent,
+                                "region_hint": decision.region_hint,
+                                "ambiguity_reason": decision.ambiguity_reason,
+                            },
+                        )
+
+                    resolved = decision.preferred_candidate
+                    target_result.resolved_location = resolved
+                    target_result.resolution_strategy = decision.resolution_strategy
+                    target_result.warnings.extend(decision.warnings)
+                    warnings.extend(
+                        f"{query_text}: {warning_message}"
+                        for warning_message in decision.warnings
+                    )
+
+                    bbox = build_bounding_box_from_radius(
+                        resolved.latitude,
+                        resolved.longitude,
+                        radius_meters,
+                    )
+                    discovered = discovery_service.discover_by_map(
+                        center_lat=resolved.latitude,
+                        center_lon=resolved.longitude,
+                        zoom=resolved.zoom or 16,
+                        bounding_box=bbox,
+                        real_estate_type=real_estate_type,
+                        enrich_mode=enrich_mode,
+                        radius_meters=radius_meters,
+                    )
+                    aggregated_sources.extend(discovered.sources)
+                    target_result.complexes = discovered.items
+                    target_result.status = "success"
+                except ServiceError as exc:
+                    target_result.status = "failed"
+                    target_result.error_code = exc.error_code
+                    target_result.error_message = exc.message
+                    if exc.details and exc.details.get("ambiguity_reason"):
+                        target_result.warnings.append(exc.details["ambiguity_reason"])
+                    warnings.append(f"{query_text}: {exc.error_code}")
+                    targets.append(target_result)
+                    continue
+                except Exception as exc:  # noqa: BLE001 - 타겟 단위 실패로 격리한다.
+                    service_error = build_service_error(
+                        exc,
+                        error_code="SCAN_TARGET_FAILED",
+                        message="개별 검색 타겟 처리에 실패했습니다.",
+                        details={"query_text": query_text},
+                    )
+                    target_result.status = "failed"
+                    target_result.error_code = service_error.error_code
+                    target_result.error_message = service_error.message
+                    warnings.append(f"{query_text}: {service_error.error_code}")
+                    targets.append(target_result)
+                    continue
 
                 if expand_articles and listing_input is not None:
                     target_articles: List[NormalizedArticle] = []
@@ -91,19 +142,42 @@ class ScanService:
                     for complex_item in ranked_complexes:
                         if not complex_item.complex_no:
                             continue
-                        listing_result = listing_service.search_by_complex(
-                            complex_item.complex_no,
-                            per_target_input,
-                        )
-                        aggregated_sources.extend(listing_result.sources)
-                        target_articles.extend(listing_result.items)
-                        if listing_result.filter_stats:
-                            per_filter_before += listing_result.filter_stats.before_count
-                            per_filter_after += listing_result.filter_stats.after_count
-                            for reason in listing_result.filter_stats.drop_reasons:
-                                drop_reason_counts[reason.filter_name] += reason.excluded_count
-                                if reason.description:
-                                    drop_reason_descriptions[reason.filter_name] = reason.description
+                        try:
+                            listing_result = listing_service.search_by_complex(
+                                complex_item.complex_no,
+                                per_target_input,
+                            )
+                            aggregated_sources.extend(listing_result.sources)
+                            target_articles.extend(listing_result.items)
+                            if listing_result.filter_stats:
+                                per_filter_before += listing_result.filter_stats.before_count
+                                per_filter_after += listing_result.filter_stats.after_count
+                                for reason in listing_result.filter_stats.drop_reasons:
+                                    drop_reason_counts[reason.filter_name] += reason.excluded_count
+                                    if reason.description:
+                                        drop_reason_descriptions[reason.filter_name] = reason.description
+                        except ServiceError as exc:
+                            target_result.status = "partial"
+                            target_result.warnings.append(
+                                f"{complex_item.complex_name or complex_item.complex_no}: {exc.error_code}"
+                            )
+                            warnings.append(
+                                f"{query_text}/{complex_item.complex_no}: {exc.error_code}"
+                            )
+                        except Exception as exc:  # noqa: BLE001 - 개별 단지 실패는 전체를 중단하지 않는다.
+                            service_error = build_service_error(
+                                exc,
+                                error_code="SCAN_COMPLEX_LISTING_FAILED",
+                                message="개별 단지 매물 확장에 실패했습니다.",
+                                details={"query_text": query_text, "complex_no": complex_item.complex_no},
+                            )
+                            target_result.status = "partial"
+                            target_result.warnings.append(
+                                f"{complex_item.complex_name or complex_item.complex_no}: {service_error.error_code}"
+                            )
+                            warnings.append(
+                                f"{query_text}/{complex_item.complex_no}: {service_error.error_code}"
+                            )
 
                     target_result.articles = _deduplicate_articles(target_articles)
 
@@ -131,6 +205,7 @@ class ScanService:
                 targets=targets,
                 items=_deduplicate_articles(merged_items),
                 filter_stats=filter_stats,
+                warnings=warnings,
                 sources=aggregated_sources,
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 공통 포맷으로 변환한다.

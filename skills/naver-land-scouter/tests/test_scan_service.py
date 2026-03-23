@@ -10,6 +10,24 @@ class FakeScanRepository:
             "기흥역": (37.275664, 127.115956),
             "구성역": (37.299021, 127.105677),
         }
+        if params["keyword"] == "죽전역":
+            return (
+                {
+                    "regions": [
+                        {
+                            "cortarNo": "2729011600",
+                            "centerLat": 35.850204,
+                            "centerLon": 128.538041,
+                            "cortarName": "대구광역시 달서구 죽전동",
+                            "cortarType": "sec",
+                            "deepLink": "/complexes?ms=35.850204,128.538041,16&e=RETAIL",
+                        }
+                    ],
+                    "keyword": params["keyword"],
+                    "totalCount": 1,
+                },
+                ApiRequestContext(endpoint="/api/search"),
+            )
         lat, lon = mapping[params["keyword"]]
         return (
             {
@@ -132,6 +150,29 @@ class TestScanService(unittest.TestCase):
         self.assertEqual(len(result.items), 2)
         self.assertEqual(result.filter_stats.before_count, 2)
         self.assertEqual(result.filter_stats.after_count, 2)
+        self.assertTrue(all(target.status == "success" for target in result.targets))
+
+    def test_scan_keeps_partial_success_when_one_target_fails(self) -> None:
+        service = ScanService(FakeScanRepository())
+
+        result = service.scan_near_queries(
+            near_queries=["기흥역", "죽전역"],
+            radius_meters=500,
+            real_estate_type="APT",
+            listing_input=ListingSearchInput(
+                trade_type="A1",
+                real_estate_type="APT",
+                price_range=PriceRange(minimum=25000, maximum=35000),
+            ),
+            expand_articles=True,
+        )
+
+        self.assertEqual(len(result.targets), 2)
+        self.assertEqual(len(result.items), 1)
+        self.assertEqual(result.targets[0].status, "success")
+        self.assertEqual(result.targets[1].status, "failed")
+        self.assertEqual(result.targets[1].error_code, "LOCATION_AMBIGUOUS")
+        self.assertTrue(result.warnings)
 
 
 if __name__ == "__main__":

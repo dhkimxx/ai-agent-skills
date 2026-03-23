@@ -6,6 +6,7 @@ from .investment_service import InvestmentIndicatorService
 from .listing_service import ListingService
 from .location_service import LocationService
 from .scan_service import ScanService
+from .workflow_service import WorkflowService
 from .errors import ServiceError
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "ListingService",
     "LocationService",
     "ScanService",
+    "WorkflowService",
     "ServiceError",
 ]
