@@ -6,7 +6,16 @@ from typing import Any, List, Optional
 from ..location_utils import calculate_distance_meters, infer_dong_name, pick_first_text
 from ..normalization import normalize_area_to_square_meter, normalize_price_to_manwon
 from ..param_builder import build_cortars_params, build_marker_params
-from ..schemas import BoundingBox, ListingResult, NormalizedArticle, RawComplexMarker
+from ..schemas import (
+    BoundingBox,
+    FilterDropReason,
+    FilterStats,
+    ListingResult,
+    NormalizedArticle,
+    RawComplexDetail,
+    RawComplexMarker,
+    RawComplexOverview,
+)
 from .contracts import NaverLandRepository
 from .errors import ServiceError, build_service_error
 
@@ -24,6 +33,8 @@ class DiscoveryService:
         real_estate_type: str,
         price_type: Optional[str] = None,
         is_presale: Optional[bool] = None,
+        enrich_mode: Optional[str] = None,
+        radius_meters: Optional[int] = None,
     ) -> ListingResult:
         try:
             cortars_params = build_cortars_params(center_lat, center_lon, zoom)
@@ -49,7 +60,12 @@ class DiscoveryService:
                 center_lat=center_lat,
                 center_lon=center_lon,
             )
+            listing_result = _filter_listing_by_radius(listing_result, radius_meters)
+            extra_sources = []
+            if enrich_mode == "complex-summary":
+                extra_sources = self._enrich_complex_summaries(listing_result.items)
             listing_result.sources.extend([cortars_context, marker_context])
+            listing_result.sources.extend(extra_sources)
             return listing_result
         except ServiceError:
             raise
@@ -62,8 +78,29 @@ class DiscoveryService:
                     "center_lat": center_lat,
                     "center_lon": center_lon,
                     "zoom": zoom,
+                    "enrich_mode": enrich_mode,
+                    "radius_meters": radius_meters,
                 },
             ) from exc
+
+    def _enrich_complex_summaries(self, items: List[NormalizedArticle]) -> List[Any]:
+        sources = []
+        for item in items:
+            if not item.complex_no:
+                continue
+            try:
+                overview_payload, overview_context = self._repository.fetch_complex_overview(
+                    item.complex_no
+                )
+                detail_payload, detail_context = self._repository.fetch_complex_detail(
+                    item.complex_no
+                )
+            except Exception:
+                continue
+
+            _apply_complex_summary(item, overview_payload, detail_payload)
+            sources.extend([overview_context, detail_context])
+        return sources
 
 
 def _extract_cortar_no(payload: Any) -> str:
@@ -186,6 +223,93 @@ def _build_marker_summary(marker: RawComplexMarker) -> Optional[str]:
     if not summary_parts:
         return None
     return ", ".join(summary_parts)
+
+
+def _filter_listing_by_radius(
+    listing_result: ListingResult,
+    radius_meters: Optional[int],
+) -> ListingResult:
+    if radius_meters is None:
+        return listing_result
+
+    before_count = len(listing_result.items)
+    filtered_items = [
+        item
+        for item in listing_result.items
+        if item.distance_meters is None or item.distance_meters <= radius_meters
+    ]
+    excluded_count = before_count - len(filtered_items)
+
+    listing_result.items = filtered_items
+    listing_result.filter_stats = FilterStats(
+        before_count=before_count,
+        after_count=len(filtered_items),
+        drop_reasons=[
+            FilterDropReason(
+                filter_name="radius_meters",
+                excluded_count=excluded_count,
+                description="반경 조건을 초과해 제외된 단지 수입니다.",
+            )
+        ]
+        if excluded_count > 0
+        else [],
+    )
+    return listing_result
+
+
+def _apply_complex_summary(
+    item: NormalizedArticle,
+    overview_payload: Any,
+    detail_payload: Any,
+) -> None:
+    overview_raw = overview_payload if isinstance(overview_payload, dict) else {}
+    detail_container = detail_payload if isinstance(detail_payload, dict) else {}
+    detail_raw = (
+        detail_container.get("complexDetail")
+        if isinstance(detail_container.get("complexDetail"), dict)
+        else detail_container
+    )
+
+    overview = RawComplexOverview.model_validate(overview_raw)
+    detail = RawComplexDetail.model_validate(detail_raw)
+
+    total_household_count = (
+        detail.total_household_count
+        or overview.total_household_count
+        or item.total_household_count
+    )
+    item.total_household_count = total_household_count
+    item.total_building_count = detail.total_building_count or item.total_building_count
+    item.completion_year = (
+        _resolve_completion_year(detail.completion_year)
+        or _resolve_completion_year(overview.completion_year)
+        or item.completion_year
+    )
+    item.parking_count = (
+        detail.parking_count
+        or _resolve_parking_count(detail.parking_count_by_household, total_household_count)
+        or item.parking_count
+    )
+    item.address = item.address or detail.address or overview.address
+    item.latitude = item.latitude or detail.latitude or overview.latitude
+    item.longitude = item.longitude or detail.longitude or overview.longitude
+
+
+def _resolve_completion_year(value: Optional[int]) -> Optional[int]:
+    if value is None:
+        return None
+    if value > 10_000:
+        return int(str(value)[:4])
+    return value
+
+
+def _resolve_parking_count(
+    parking_count_by_household: Optional[float],
+    total_household_count: Optional[int],
+) -> Optional[int]:
+    if parking_count_by_household is None or total_household_count is None:
+        return None
+    return int(round(parking_count_by_household * total_household_count))
 
 
 def _resolve_marker_address(

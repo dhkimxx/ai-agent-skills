@@ -74,6 +74,9 @@ class TestListingService(unittest.TestCase):
         self.assertEqual(result.items[0].longitude, 127.105713)
         self.assertGreater(result.items[0].distance_meters or 0, 0)
         self.assertEqual(len(result.sources), 2)
+        self.assertEqual(result.filter_stats.before_count, 2)
+        self.assertEqual(result.filter_stats.after_count, 1)
+        self.assertEqual(result.filter_stats.drop_reasons[0].filter_name, "exclusive_area_range")
 
 
 if __name__ == "__main__":

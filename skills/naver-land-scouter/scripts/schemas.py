@@ -81,6 +81,13 @@ class InvestmentIndicatorInput(NaverLandBaseModel):
     area_no: Optional[str] = None
 
 
+class HistoryInput(NaverLandBaseModel):
+    complex_no: Optional[str] = None
+    article_no: Optional[str] = None
+    trade_type: Optional[str] = None
+    area_no: Optional[str] = None
+
+
 class RawComplexOverview(NaverLandBaseModel):
     complex_no: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("complexNo", "complex_no")
@@ -116,7 +123,12 @@ class RawComplexOverview(NaverLandBaseModel):
         ),
     )
     completion_year: Optional[int] = Field(
-        default=None, validation_alias=AliasChoices("useApprovalYear", "completionYear")
+        default=None,
+        validation_alias=AliasChoices(
+            "useApprovalYear",
+            "completionYear",
+            "useApproveYmd",
+        ),
     )
 
 
@@ -152,7 +164,19 @@ class RawComplexDetail(NaverLandBaseModel):
         ),
     )
     total_building_count: Optional[int] = Field(
-        default=None, validation_alias=AliasChoices("totalBuildingCount")
+        default=None, validation_alias=AliasChoices("totalBuildingCount", "totalDongCount")
+    )
+    completion_year: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("useApproveYmd", "completionYear"),
+    )
+    parking_count: Optional[int] = Field(
+        default=None,
+        validation_alias=AliasChoices("parkingPossibleCount", "parkingCount"),
+    )
+    parking_count_by_household: Optional[float] = Field(
+        default=None,
+        validation_alias=AliasChoices("parkingCountByHousehold"),
     )
 
 
@@ -161,10 +185,14 @@ class RawArticleSummary(NaverLandBaseModel):
         default=None, validation_alias=AliasChoices("articleNo", "atclNo")
     )
     complex_no: Optional[str] = Field(
-        default=None, validation_alias=AliasChoices("complexNo", "complex_no")
+        default=None,
+        validation_alias=AliasChoices("complexNo", "complex_no", "hscpNo"),
+    )
+    area_no: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("areaNo", "ptpNo")
     )
     article_name: Optional[str] = Field(
-        default=None, validation_alias=AliasChoices("articleName", "atclNm")
+        default=None, validation_alias=AliasChoices("articleName", "atclNm", "aptName")
     )
     trade_type: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("tradeType", "tradeTypeCode")
@@ -183,13 +211,15 @@ class RawArticleSummary(NaverLandBaseModel):
         default=None, validation_alias=AliasChoices("rentPrice")
     )
     area: Optional[float] = Field(
-        default=None, validation_alias=AliasChoices("area", "area1")
+        default=None, validation_alias=AliasChoices("area", "area1", "supplySpace")
     )
     exclusive_area: Optional[float] = Field(
-        default=None, validation_alias=AliasChoices("exclusiveArea", "area2")
+        default=None,
+        validation_alias=AliasChoices("exclusiveArea", "area2", "exclusiveSpace"),
     )
     supply_area: Optional[float] = Field(
-        default=None, validation_alias=AliasChoices("supplyArea", "area1")
+        default=None,
+        validation_alias=AliasChoices("supplyArea", "area1", "supplySpace"),
     )
     floor_info: Optional[str] = Field(default=None, validation_alias=AliasChoices("floorInfo"))
     direction: Optional[str] = None
@@ -308,6 +338,69 @@ class RawComplexMarker(NaverLandBaseModel):
     )
 
 
+class RawSearchRegion(NaverLandBaseModel):
+    cortar_no: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("cortarNo")
+    )
+    center_lat: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("centerLat")
+    )
+    center_lon: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("centerLon")
+    )
+    cortar_name: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("cortarName")
+    )
+    cortar_type: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("cortarType")
+    )
+    deep_link: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("deepLink")
+    )
+
+
+class RawSearchComplex(NaverLandBaseModel):
+    complex_no: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("complexNo")
+    )
+    complex_name: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("complexName")
+    )
+    cortar_no: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("cortarNo")
+    )
+    real_estate_type_code: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("realEstateTypeCode")
+    )
+    latitude: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("latitude")
+    )
+    longitude: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("longitude")
+    )
+    total_household_count: Optional[int] = Field(
+        default=None, validation_alias=AliasChoices("totalHouseholdCount")
+    )
+    total_dong_count: Optional[int] = Field(
+        default=None, validation_alias=AliasChoices("totalDongCount")
+    )
+    use_approve_ymd: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("useApproveYmd")
+    )
+    cortar_address: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("cortarAddress")
+    )
+    deep_link: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("deepLink")
+    )
+    min_supply_area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("minSupplyArea")
+    )
+    max_supply_area: Optional[float] = Field(
+        default=None, validation_alias=AliasChoices("maxSupplyArea")
+    )
+
+
 class RawPricePoint(NaverLandBaseModel):
     base_date: Optional[str] = Field(
         default=None, validation_alias=AliasChoices("baseDate", "date", "yearMonth")
@@ -349,6 +442,10 @@ class NormalizedArticle(NaverLandBaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     distance_meters: Optional[int] = None
+    total_household_count: Optional[int] = None
+    total_building_count: Optional[int] = None
+    completion_year: Optional[int] = None
+    parking_count: Optional[int] = None
     article_feature_description: Optional[str] = None
 
 
@@ -360,7 +457,56 @@ class NormalizedComplex(NaverLandBaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     total_household_count: Optional[int] = None
+    total_building_count: Optional[int] = None
     completion_year: Optional[int] = None
+    parking_count: Optional[int] = None
+
+
+class FilterDropReason(NaverLandBaseModel):
+    filter_name: str
+    excluded_count: int
+    description: Optional[str] = None
+
+
+class FilterStats(NaverLandBaseModel):
+    before_count: int = 0
+    after_count: int = 0
+    drop_reasons: List[FilterDropReason] = Field(default_factory=list)
+
+
+class ResolvedLocation(NaverLandBaseModel):
+    query_text: Optional[str] = None
+    label: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    zoom: Optional[int] = None
+    deep_link: Optional[str] = None
+    cortar_no: Optional[str] = None
+    address: Optional[str] = None
+    match_type: Optional[str] = None
+
+
+class SearchResult(NaverLandBaseModel):
+    query_text: Optional[str] = None
+    candidates: List[ResolvedLocation] = Field(default_factory=list)
+    complexes: List[NormalizedComplex] = Field(default_factory=list)
+    nearby_complexes: List[NormalizedArticle] = Field(default_factory=list)
+    sources: List[ApiRequestContext] = Field(default_factory=list)
+
+
+class ScanTargetResult(NaverLandBaseModel):
+    query_text: Optional[str] = None
+    resolved_location: Optional[ResolvedLocation] = None
+    complexes: List[NormalizedArticle] = Field(default_factory=list)
+    articles: List[NormalizedArticle] = Field(default_factory=list)
+    filter_stats: Optional[FilterStats] = None
+
+
+class ScanResult(NaverLandBaseModel):
+    targets: List[ScanTargetResult] = Field(default_factory=list)
+    items: List[NormalizedArticle] = Field(default_factory=list)
+    filter_stats: Optional[FilterStats] = None
+    sources: List[ApiRequestContext] = Field(default_factory=list)
 
 
 class NormalizedSchool(NaverLandBaseModel):
@@ -389,9 +535,41 @@ class NormalizedRealTradeRecord(NaverLandBaseModel):
     floor: Optional[str] = None
 
 
+class HistoryTradePoint(NaverLandBaseModel):
+    trade_date: Optional[str] = None
+    price: Optional[int] = None
+    floor: Optional[str] = None
+
+
+class HistoryWindowSummary(NaverLandBaseModel):
+    years: int
+    sample_size: int = 0
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    average_price: Optional[int] = None
+    median_price: Optional[int] = None
+    minimum_price: Optional[int] = None
+    maximum_price: Optional[int] = None
+    latest_trade_date: Optional[str] = None
+
+
+class PremiumSummary(NaverLandBaseModel):
+    primary_window_years: int
+    current_asking_price: Optional[int] = None
+    reference_trade_average_price: Optional[int] = None
+    reference_trade_median_price: Optional[int] = None
+    premium_amount: Optional[int] = None
+    premium_rate: Optional[float] = None
+    sample_size: int = 0
+    latest_trade_date: Optional[str] = None
+    judgement: Optional[str] = None
+    judgement_reason: Optional[str] = None
+
+
 class ListingResult(NaverLandBaseModel):
     query_text: Optional[str] = None
     items: List[NormalizedArticle] = Field(default_factory=list)
+    filter_stats: Optional[FilterStats] = None
     sources: List[ApiRequestContext] = Field(default_factory=list)
 
 
@@ -423,10 +601,23 @@ class InvestmentIndicatorResult(NaverLandBaseModel):
     sources: List[ApiRequestContext] = Field(default_factory=list)
 
 
+class HistoryResult(NaverLandBaseModel):
+    article: Optional[NormalizedArticle] = None
+    trade_type: Optional[str] = None
+    area_no: Optional[str] = None
+    trade_points: List[HistoryTradePoint] = Field(default_factory=list)
+    window_summaries: List[HistoryWindowSummary] = Field(default_factory=list)
+    premium_summary: Optional[PremiumSummary] = None
+    sources: List[ApiRequestContext] = Field(default_factory=list)
+
+
 class HybridReportPayload(NaverLandBaseModel):
     workflow: str
     listing_result: Optional[ListingResult] = None
+    search_result: Optional[SearchResult] = None
+    scan_result: Optional[ScanResult] = None
     complex_report: Optional[ComplexReport] = None
     comparison_result: Optional[ComparisonResult] = None
     investment_indicator_result: Optional[InvestmentIndicatorResult] = None
+    history_result: Optional[HistoryResult] = None
     generated_at: Optional[str] = None

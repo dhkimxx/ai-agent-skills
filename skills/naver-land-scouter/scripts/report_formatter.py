@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Iterable, List, Optional
+from typing import List, Optional
 
 from .constants import PYEONG_TO_SQUARE_METER
 from .schemas import (
-    ComparisonItem,
     ComparisonResult,
     ComplexReport,
+    FilterStats,
+    HistoryResult,
     HybridReportPayload,
     ListingResult,
     NormalizedArticle,
     NormalizedComplex,
-    NormalizedPriceSummary,
     NormalizedRealTradeRecord,
+    ResolvedLocation,
+    ScanResult,
+    SearchResult,
     NormalizedSchool,
     NormalizedTransport,
 )
@@ -57,6 +60,22 @@ def _build_summary(payload: HybridReportPayload) -> List[str]:
         summary.append(
             f"- 매물 수: {len(payload.listing_result.items)}건"
         )
+        if payload.listing_result.filter_stats:
+            summary.append(
+                f"- 필터 적용 후: {payload.listing_result.filter_stats.after_count}/{payload.listing_result.filter_stats.before_count}건"
+            )
+
+    if payload.search_result:
+        summary.append(
+            f"- 위치 후보: {len(payload.search_result.candidates)}개"
+        )
+        summary.append(
+            f"- 주변 단지: {len(payload.search_result.nearby_complexes)}개"
+        )
+
+    if payload.scan_result:
+        summary.append(f"- 스캔 대상: {len(payload.scan_result.targets)}곳")
+        summary.append(f"- 통합 결과: {len(payload.scan_result.items)}건")
 
     if payload.complex_report:
         complex_summary = _format_complex_title(payload.complex_report.complex)
@@ -73,18 +92,33 @@ def _build_summary(payload: HybridReportPayload) -> List[str]:
         summary.append(f"- Gap: {gap}")
         summary.append(f"- Yield: {yield_rate}")
 
+    if payload.history_result:
+        summary.append(
+            f"- 실거래 표본: {len(payload.history_result.trade_points)}건"
+        )
+        if payload.history_result.premium_summary:
+            summary.append(
+                f"- Premium 판단: {payload.history_result.premium_summary.judgement or '-'}"
+            )
+
     return summary
 
 
 def _build_table(payload: HybridReportPayload) -> List[str]:
     if payload.comparison_result:
         return _build_comparison_table(payload.comparison_result)
+    if payload.search_result:
+        return _build_search_table(payload.search_result)
+    if payload.scan_result:
+        return _build_scan_table(payload.scan_result)
     if payload.listing_result:
         return _build_listing_table(payload.listing_result)
     if payload.complex_report:
         return _build_complex_summary_table(payload.complex_report)
     if payload.investment_indicator_result:
         return _build_investment_table(payload.investment_indicator_result)
+    if payload.history_result:
+        return _build_history_table(payload.history_result)
     return ["| 항목 | 값 |", "| --- | --- |", "| 데이터 | 없음 |"]
 
 
@@ -97,12 +131,21 @@ def _build_details(payload: HybridReportPayload) -> List[str]:
     if payload.listing_result:
         details.extend(_build_listing_details(payload.listing_result))
 
+    if payload.search_result:
+        details.extend(_build_search_details(payload.search_result))
+
+    if payload.scan_result:
+        details.extend(_build_scan_details(payload.scan_result))
+
     if payload.comparison_result and payload.comparison_result.recommendation:
         details.append(f"- 추천 사유: {payload.comparison_result.recommendation}")
 
     if payload.investment_indicator_result:
         for note in payload.investment_indicator_result.notes:
             details.append(f"- 참고: {note}")
+
+    if payload.history_result:
+        details.extend(_build_history_details(payload.history_result))
 
     return details
 
@@ -195,6 +238,30 @@ def _build_investment_table(result) -> List[str]:
     return rows
 
 
+def _build_history_table(result: HistoryResult) -> List[str]:
+    header = "| 구간 | 표본 | 평균 | 중앙값 | 범위 | 최신 거래일 |"
+    separator = "| --- | --- | --- | --- | --- | --- |"
+    rows = [header, separator]
+
+    for summary in result.window_summaries:
+        rows.append(
+            "| {years}년 | {sample}건 | {avg} | {median} | {min_price} ~ {max_price} | {latest} |".format(
+                years=summary.years,
+                sample=summary.sample_size,
+                avg=_format_price(summary.average_price),
+                median=_format_price(summary.median_price),
+                min_price=_format_price(summary.minimum_price),
+                max_price=_format_price(summary.maximum_price),
+                latest=summary.latest_trade_date or "-",
+            )
+        )
+
+    if len(rows) == 2:
+        rows.append("| 데이터 | 0건 | - | - | - | - |")
+
+    return rows
+
+
 def _build_complex_details(report: ComplexReport) -> List[str]:
     details: List[str] = []
     if report.schools:
@@ -213,6 +280,9 @@ def _build_complex_details(report: ComplexReport) -> List[str]:
 
 def _build_listing_details(result: ListingResult) -> List[str]:
     details: List[str] = []
+    filter_stat_detail = _format_filter_stats(result.filter_stats)
+    if filter_stat_detail:
+        details.append(f"- 필터 통계: {filter_stat_detail}")
     for item in result.items[:5]:
         location_summary = _format_location_detail(item)
         if location_summary:
@@ -221,6 +291,112 @@ def _build_listing_details(result: ListingResult) -> List[str]:
             details.append(
                 f"- {item.article_name or item.article_no}: {item.article_feature_description}"
             )
+    return details
+
+
+def _build_history_details(result: HistoryResult) -> List[str]:
+    details: List[str] = []
+    if result.article:
+        details.append(
+            "- 기준 매물: {name} / 호가 {price}".format(
+                name=result.article.article_name or result.article.article_no or "-",
+                price=_format_price(result.article.price),
+            )
+        )
+
+    if result.premium_summary:
+        details.append(
+            "- 최근 1년 대비: {amount} ({rate}) / 판단 {judgement}".format(
+                amount=_format_price(result.premium_summary.premium_amount),
+                rate=_format_percentage(result.premium_summary.premium_rate),
+                judgement=result.premium_summary.judgement or "-",
+            )
+        )
+        if result.premium_summary.judgement_reason:
+            details.append(
+                f"- 판단 근거: {result.premium_summary.judgement_reason}"
+            )
+
+    if result.trade_points:
+        preview = "; ".join(
+            "{date} {price}".format(
+                date=point.trade_date or "-",
+                price=_format_price(point.price),
+            )
+            for point in result.trade_points[:5]
+        )
+        details.append(f"- 최근 실거래: {preview}")
+
+    return details
+
+
+def _build_search_table(result: SearchResult) -> List[str]:
+    header = "| 후보 | 좌표 | 유형 |"
+    separator = "| --- | --- | --- |"
+    rows = [header, separator]
+    for candidate in result.candidates[:5]:
+        rows.append(
+            "| {label} | {latlon} | {match_type} |".format(
+                label=candidate.label or "-",
+                latlon=_format_resolved_location(candidate),
+                match_type=candidate.match_type or "-",
+            )
+        )
+    if len(rows) == 2:
+        rows.append("| 데이터 | 없음 | - |")
+    return rows
+
+
+def _build_search_details(result: SearchResult) -> List[str]:
+    details: List[str] = []
+    for complex_item in result.complexes[:5]:
+        details.append(
+            "- 검색 매치: {name} / {address} / {households}".format(
+                name=complex_item.complex_name or "-",
+                address=complex_item.address or "-",
+                households=_format_optional_int(complex_item.total_household_count),
+            )
+        )
+    for nearby_item in result.nearby_complexes[:5]:
+        details.append(
+            "- 주변 단지: {name} / {distance}".format(
+                name=nearby_item.article_name or "-",
+                distance=_format_distance(nearby_item.distance_meters),
+            )
+        )
+    return details
+
+
+def _build_scan_table(result: ScanResult) -> List[str]:
+    header = "| 대상 | 결과 수 | 대표 좌표 |"
+    separator = "| --- | --- | --- |"
+    rows = [header, separator]
+    for target in result.targets:
+        rows.append(
+            "| {target} | {count} | {location} |".format(
+                target=target.query_text or "-",
+                count=len(target.articles or target.complexes),
+                location=_format_resolved_location(target.resolved_location),
+            )
+        )
+    if len(rows) == 2:
+        rows.append("| 데이터 | 0 | - |")
+    return rows
+
+
+def _build_scan_details(result: ScanResult) -> List[str]:
+    details: List[str] = []
+    filter_stat_detail = _format_filter_stats(result.filter_stats)
+    if filter_stat_detail:
+        details.append(f"- 통합 필터 통계: {filter_stat_detail}")
+    for item in result.items[:5]:
+        details.append(
+            "- 통합 결과: {name} / {price} / {distance}".format(
+                name=item.article_name or item.article_no or "-",
+                price=_format_price(item.price),
+                distance=_format_distance(item.distance_meters),
+            )
+        )
     return details
 
 
@@ -271,6 +447,12 @@ def _format_location(article: NormalizedArticle) -> str:
     if not location_parts:
         return "-"
     return " / ".join(location_parts)
+
+
+def _format_resolved_location(location: Optional[ResolvedLocation]) -> str:
+    if location is None or location.latitude is None or location.longitude is None:
+        return "-"
+    return f"{location.latitude:.6f}, {location.longitude:.6f}"
 
 
 def _format_location_detail(article: NormalizedArticle) -> Optional[str]:
@@ -381,3 +563,12 @@ def _format_distance(value: Optional[int]) -> str:
     if value is None:
         return "-"
     return f"{value:,}m"
+
+
+def _format_filter_stats(filter_stats: Optional[FilterStats]) -> Optional[str]:
+    if filter_stats is None:
+        return None
+    parts = [f"{filter_stats.after_count}/{filter_stats.before_count}건 유지"]
+    for reason in filter_stats.drop_reasons:
+        parts.append(f"{reason.filter_name} 제외 {reason.excluded_count}건")
+    return ", ".join(parts)

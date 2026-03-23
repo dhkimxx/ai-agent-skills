@@ -7,6 +7,8 @@ from ..location_utils import calculate_distance_meters, infer_dong_name, pick_fi
 from ..normalization import normalize_price_to_manwon
 from ..param_builder import build_article_list_params, resolve_area_range_bounds
 from ..schemas import (
+    FilterDropReason,
+    FilterStats,
     ListingResult,
     ListingSearchInput,
     NormalizedArticle,
@@ -54,7 +56,8 @@ class ListingService:
                 )
                 for item in raw_items
             ]
-            normalized_items = _filter_by_exclusive_area(
+            before_count = len(normalized_items)
+            normalized_items, drop_reasons = _filter_by_exclusive_area(
                 normalized_items,
                 listing_input.exclusive_area_range,
             )
@@ -64,6 +67,11 @@ class ListingService:
             return ListingResult(
                 query_text=listing_input.query_text,
                 items=normalized_items,
+                filter_stats=FilterStats(
+                    before_count=before_count,
+                    after_count=len(normalized_items),
+                    drop_reasons=drop_reasons,
+                ),
                 sources=sources,
             )
         except Exception as exc:  # noqa: BLE001 - 서비스 레이어에서 공통 포맷으로 변환한다.
@@ -176,28 +184,41 @@ def _normalize_article_summary(
 def _filter_by_exclusive_area(
     articles: List[NormalizedArticle],
     exclusive_area_range: Any,
-) -> List[NormalizedArticle]:
+) -> tuple[List[NormalizedArticle], List[FilterDropReason]]:
     if not exclusive_area_range:
-        return articles
+        return articles, []
 
     lower, upper = resolve_area_range_bounds(
         exclusive_area_range.minimum,
         exclusive_area_range.maximum,
     )
     if lower is None and upper is None:
-        return articles
+        return articles, []
 
     filtered: List[NormalizedArticle] = []
+    excluded_count = 0
     for article in articles:
         area = article.exclusive_area or article.area
         if area is None:
+            excluded_count += 1
             continue
         if lower is not None and area < lower:
+            excluded_count += 1
             continue
         if upper is not None and area > upper:
+            excluded_count += 1
             continue
         filtered.append(article)
-    return filtered
+    drop_reasons: List[FilterDropReason] = []
+    if excluded_count > 0:
+        drop_reasons.append(
+            FilterDropReason(
+                filter_name="exclusive_area_range",
+                excluded_count=excluded_count,
+                description="전용면적 후처리 필터로 제외된 매물 수입니다.",
+            )
+        )
+    return filtered, drop_reasons
 
 
 def _resolve_address_text(raw: dict, fallback: Optional[str]) -> Optional[str]:

@@ -53,3 +53,8 @@ class NaverLandRepository(Protocol):
         self, params: Dict[str, Any]
     ) -> Tuple[Any, ApiRequestContext]:
         ...
+
+    def fetch_search(
+        self, params: Dict[str, Any]
+    ) -> Tuple[Any, ApiRequestContext]:
+        ...

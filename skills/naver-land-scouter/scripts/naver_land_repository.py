@@ -72,3 +72,9 @@ class DefaultNaverLandRepository:
     ) -> Tuple[Any, ApiRequestContext]:
         endpoint = "/api/complexes/single-markers/2.0"
         return self._client.get_json(endpoint, params=params)
+
+    def fetch_search(
+        self, params: Dict[str, Any]
+    ) -> Tuple[Any, ApiRequestContext]:
+        endpoint = "/api/search"
+        return self._client.get_json(endpoint, params=params)

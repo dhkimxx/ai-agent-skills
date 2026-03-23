@@ -13,6 +13,7 @@ from .report_formatter import format_hybrid_report, format_json_report
 from .schemas import (
     BoundingBox,
     ComplexAnalysisInput,
+    HistoryInput,
     HybridReportPayload,
     InvestmentIndicatorInput,
     ListingSearchInput,
@@ -21,10 +22,14 @@ from .services import (
     ComparisonService,
     ComplexAnalysisService,
     DiscoveryService,
+    HistoryService,
     InvestmentIndicatorService,
     ListingService,
+    LocationService,
+    ScanService,
     ServiceError,
 )
+from .location_utils import build_bounding_box_from_radius, parse_radius_to_meters
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,19 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     list_parser = subparsers.add_parser("listings", help="단지 매물 리스트 조회")
     list_parser.add_argument("--complex-no", required=True)
-    list_parser.add_argument("--trade-type")
-    list_parser.add_argument("--real-estate-type")
-    list_parser.add_argument("--price-min")
-    list_parser.add_argument("--price-max")
-    list_parser.add_argument("--area-min")
-    list_parser.add_argument("--area-max")
-    list_parser.add_argument("--exclusive-area-min")
-    list_parser.add_argument("--exclusive-area-max")
-    list_parser.add_argument("--order", default="rank")
-    list_parser.add_argument("--page", type=int, default=1)
-    list_parser.add_argument("--directions", nargs="*")
-    list_parser.add_argument("--center-lat", type=float)
-    list_parser.add_argument("--center-lon", type=float)
+    _add_listing_filter_arguments(list_parser)
 
     complex_parser = subparsers.add_parser("complex", help="단지 리포트")
     complex_parser.add_argument("--complex-no", required=True)
@@ -65,17 +58,53 @@ def build_parser() -> argparse.ArgumentParser:
     invest_parser = subparsers.add_parser("invest", help="투자 지표")
     invest_parser.add_argument("--article-no", required=True)
 
+    history_parser = subparsers.add_parser("history", help="실거래 히스토리")
+    history_target_group = history_parser.add_mutually_exclusive_group(required=True)
+    history_target_group.add_argument("--article-no")
+    history_target_group.add_argument("--complex-no")
+    history_parser.add_argument("--trade-type")
+    history_parser.add_argument("--area-no")
+
+    search_parser = subparsers.add_parser("search", help="위치/단지 검색")
+    search_parser.add_argument("query_text")
+    search_parser.add_argument("--radius", default="700m")
+    search_parser.add_argument("--real-estate-type", default="APT")
+    search_parser.add_argument(
+        "--enrich",
+        choices=["complex-summary"],
+        default=None,
+    )
+
     discover_parser = subparsers.add_parser("discover", help="지도 기반 탐색")
-    discover_parser.add_argument("--center-lat", type=float, required=True)
-    discover_parser.add_argument("--center-lon", type=float, required=True)
-    discover_parser.add_argument("--zoom", type=int, required=True)
-    discover_parser.add_argument("--left-lon", type=float, required=True)
-    discover_parser.add_argument("--right-lon", type=float, required=True)
-    discover_parser.add_argument("--top-lat", type=float, required=True)
-    discover_parser.add_argument("--bottom-lat", type=float, required=True)
+    discover_parser.add_argument("--near")
+    discover_parser.add_argument("--radius", default="500m")
+    discover_parser.add_argument("--center-lat", type=float)
+    discover_parser.add_argument("--center-lon", type=float)
+    discover_parser.add_argument("--zoom", type=int)
+    discover_parser.add_argument("--left-lon", type=float)
+    discover_parser.add_argument("--right-lon", type=float)
+    discover_parser.add_argument("--top-lat", type=float)
+    discover_parser.add_argument("--bottom-lat", type=float)
     discover_parser.add_argument("--real-estate-type", required=True)
     discover_parser.add_argument("--price-type")
     discover_parser.add_argument("--is-presale", action="store_true")
+    discover_parser.add_argument(
+        "--enrich",
+        choices=["complex-summary"],
+        default=None,
+    )
+
+    scan_parser = subparsers.add_parser("scan", help="여러 위치 통합 검색")
+    scan_parser.add_argument("--near", action="append", required=True)
+    scan_parser.add_argument("--radius", default="500m")
+    scan_parser.add_argument("--real-estate-type", required=True)
+    scan_parser.add_argument("--complex-limit", type=int, default=12)
+    scan_parser.add_argument(
+        "--enrich",
+        choices=["complex-summary"],
+        default=None,
+    )
+    _add_listing_filter_arguments(scan_parser, include_real_estate_type=False)
 
     parser.add_argument(
         "--header",
@@ -173,26 +202,61 @@ def main() -> None:
                 workflow="invest",
                 investment_indicator_result=investment_result,
             )
+        elif args.command == "history":
+            service = HistoryService(repository)
+            history_result = service.create_history(_build_history_input(args))
+            payload = HybridReportPayload(
+                workflow="history",
+                history_result=history_result,
+            )
+        elif args.command == "search":
+            service = LocationService(repository)
+            search_result = service.search(
+                query_text=args.query_text,
+                radius_meters=parse_radius_to_meters(args.radius),
+                real_estate_type=args.real_estate_type,
+                enrich_mode=args.enrich,
+            )
+            payload = HybridReportPayload(
+                workflow="search",
+                search_result=search_result,
+            )
         elif args.command == "discover":
+            location_service = LocationService(repository)
             service = DiscoveryService(repository)
-            bounding_box = _build_bbox(args)
-            if bounding_box is None:
-                raise ServiceError(
-                    error_code="BBOX_REQUIRED",
-                    message="지도 탐색에는 bbox 파라미터가 필요합니다.",
-                )
+            center_lat, center_lon, zoom, bounding_box = _resolve_discover_request(
+                args,
+                location_service,
+            )
             listing_result = service.discover_by_map(
-                center_lat=args.center_lat,
-                center_lon=args.center_lon,
-                zoom=args.zoom,
+                center_lat=center_lat,
+                center_lon=center_lon,
+                zoom=zoom,
                 bounding_box=bounding_box,
                 real_estate_type=args.real_estate_type,
                 price_type=args.price_type,
                 is_presale=args.is_presale,
+                enrich_mode=args.enrich,
             )
             payload = HybridReportPayload(
                 workflow="discover",
                 listing_result=listing_result,
+            )
+        elif args.command == "scan":
+            service = ScanService(repository)
+            listing_input = _build_listing_input(args)
+            scan_result = service.scan_near_queries(
+                near_queries=args.near,
+                radius_meters=parse_radius_to_meters(args.radius),
+                real_estate_type=args.real_estate_type,
+                listing_input=listing_input,
+                enrich_mode=args.enrich,
+                complex_limit=args.complex_limit,
+                expand_articles=_should_expand_scan_articles(args),
+            )
+            payload = HybridReportPayload(
+                workflow="scan",
+                scan_result=scan_result,
             )
         else:
             raise ServiceError(
@@ -203,7 +267,10 @@ def main() -> None:
         payload.generated_at = _utc_now()
         report = _render_report(payload, args.format)
         _write_output_if_requested(args.output_file, report)
-        print(report)
+        if args.output_file:
+            print(_build_output_notice(payload, args.output_file, args.format))
+        else:
+            print(report)
     except ServiceError as exc:
         print(_format_service_error(exc))
     finally:
@@ -297,6 +364,26 @@ def _build_listing_input(args: argparse.Namespace) -> ListingSearchInput:
     )
 
 
+def _add_listing_filter_arguments(
+    parser: argparse.ArgumentParser,
+    include_real_estate_type: bool = True,
+) -> None:
+    if include_real_estate_type:
+        parser.add_argument("--real-estate-type")
+    parser.add_argument("--trade-type")
+    parser.add_argument("--price-min")
+    parser.add_argument("--price-max")
+    parser.add_argument("--area-min")
+    parser.add_argument("--area-max")
+    parser.add_argument("--exclusive-area-min")
+    parser.add_argument("--exclusive-area-max")
+    parser.add_argument("--order", default="rank")
+    parser.add_argument("--page", type=int, default=1)
+    parser.add_argument("--directions", nargs="*")
+    parser.add_argument("--center-lat", type=float)
+    parser.add_argument("--center-lon", type=float)
+
+
 def _build_price_range(price_min: Optional[str], price_max: Optional[str]) -> Optional[Dict[str, Any]]:
     if price_min is None and price_max is None:
         return None
@@ -337,6 +424,62 @@ def _build_bbox(args: argparse.Namespace) -> Optional[BoundingBox]:
     return None
 
 
+def _resolve_discover_request(
+    args: argparse.Namespace,
+    location_service: LocationService,
+) -> tuple[float, float, int, BoundingBox]:
+    if getattr(args, "near", None):
+        resolved = location_service.resolve_single_location(args.near)
+        radius_meters = parse_radius_to_meters(args.radius)
+        return (
+            resolved.latitude,
+            resolved.longitude,
+            resolved.zoom or args.zoom or 16,
+            build_bounding_box_from_radius(
+                resolved.latitude,
+                resolved.longitude,
+                radius_meters,
+            ),
+        )
+
+    bounding_box = _build_bbox(args)
+    if bounding_box is None:
+        raise ServiceError(
+            error_code="BBOX_REQUIRED",
+            message="지도 탐색에는 bbox 파라미터가 필요합니다.",
+        )
+    if args.center_lat is None or args.center_lon is None or args.zoom is None:
+        raise ServiceError(
+            error_code="CENTER_REQUIRED",
+            message="수동 지도 탐색에는 center-lat, center-lon, zoom이 필요합니다.",
+        )
+    return args.center_lat, args.center_lon, args.zoom, bounding_box
+
+
+def _build_history_input(args: argparse.Namespace) -> HistoryInput:
+    return HistoryInput(
+        article_no=getattr(args, "article_no", None),
+        complex_no=getattr(args, "complex_no", None),
+        trade_type=getattr(args, "trade_type", None),
+        area_no=getattr(args, "area_no", None),
+    )
+
+
+def _should_expand_scan_articles(args: argparse.Namespace) -> bool:
+    return any(
+        [
+            getattr(args, "trade_type", None),
+            getattr(args, "price_min", None),
+            getattr(args, "price_max", None),
+            getattr(args, "area_min", None),
+            getattr(args, "area_max", None),
+            getattr(args, "exclusive_area_min", None),
+            getattr(args, "exclusive_area_max", None),
+            bool(getattr(args, "directions", None)),
+        ]
+    )
+
+
 def _render_report(payload: HybridReportPayload, output_format: str) -> str:
     if output_format == "json":
         return format_json_report(payload)
@@ -357,6 +500,29 @@ def _write_output_if_requested(output_file: Optional[str], report: str) -> None:
             message="결과 파일 저장에 실패했습니다.",
             details={"path": output_file, "reason": str(exc)},
         ) from exc
+
+
+def _build_output_notice(
+    payload: HybridReportPayload,
+    output_file: str,
+    output_format: str,
+) -> str:
+    summary: Dict[str, Any] = {
+        "outputFile": str(Path(output_file).expanduser()),
+        "workflow": payload.workflow,
+        "format": output_format,
+    }
+    if payload.listing_result:
+        summary["itemCount"] = len(payload.listing_result.items)
+    if payload.search_result:
+        summary["candidateCount"] = len(payload.search_result.candidates)
+        summary["nearbyComplexCount"] = len(payload.search_result.nearby_complexes)
+    if payload.scan_result:
+        summary["targetCount"] = len(payload.scan_result.targets)
+        summary["itemCount"] = len(payload.scan_result.items)
+    if payload.history_result:
+        summary["tradePointCount"] = len(payload.history_result.trade_points)
+    return json.dumps(summary, ensure_ascii=False, indent=2)
 
 
 def _format_service_error(exc: ServiceError) -> str:

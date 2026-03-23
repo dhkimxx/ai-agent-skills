@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.cli import _render_report, _write_output_if_requested
+from scripts.cli import _build_output_notice, _render_report, _write_output_if_requested
 from scripts.schemas import HybridReportPayload, ListingResult, NormalizedArticle
 
 
@@ -37,6 +37,20 @@ class TestCliOutput(unittest.TestCase):
             _write_output_if_requested(str(output_path), '{"ok": true}')
 
             self.assertEqual(output_path.read_text(encoding="utf-8"), '{"ok": true}\n')
+
+    def test_build_output_notice(self) -> None:
+        payload = HybridReportPayload(
+            workflow="listings",
+            listing_result=ListingResult(items=[NormalizedArticle(article_no="1")]),
+        )
+
+        notice = json.loads(
+            _build_output_notice(payload, "/tmp/result.json", "json")
+        )
+
+        self.assertEqual(notice["workflow"], "listings")
+        self.assertEqual(notice["itemCount"], 1)
+        self.assertEqual(notice["outputFile"], "/tmp/result.json")
 
 
 if __name__ == "__main__":
