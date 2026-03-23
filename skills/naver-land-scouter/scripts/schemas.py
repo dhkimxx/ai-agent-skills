@@ -614,6 +614,7 @@ class HistoryResult(NaverLandBaseModel):
 class HybridReportPayload(NaverLandBaseModel):
     workflow: str
     listing_result: Optional[ListingResult] = None
+    discovery_result: Optional[ListingResult] = None
     search_result: Optional[SearchResult] = None
     scan_result: Optional[ScanResult] = None
     complex_report: Optional[ComplexReport] = None

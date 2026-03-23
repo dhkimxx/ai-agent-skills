@@ -240,7 +240,7 @@ def main() -> None:
             )
             payload = HybridReportPayload(
                 workflow="discover",
-                listing_result=listing_result,
+                discovery_result=listing_result,
             )
         elif args.command == "scan":
             service = ScanService(repository)
@@ -514,6 +514,8 @@ def _build_output_notice(
     }
     if payload.listing_result:
         summary["itemCount"] = len(payload.listing_result.items)
+    if payload.discovery_result:
+        summary["itemCount"] = len(payload.discovery_result.items)
     if payload.search_result:
         summary["candidateCount"] = len(payload.search_result.candidates)
         summary["nearbyComplexCount"] = len(payload.search_result.nearby_complexes)

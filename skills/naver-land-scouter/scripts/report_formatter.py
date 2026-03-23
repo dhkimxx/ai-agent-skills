@@ -64,6 +64,14 @@ def _build_summary(payload: HybridReportPayload) -> List[str]:
             summary.append(
                 f"- 필터 적용 후: {payload.listing_result.filter_stats.after_count}/{payload.listing_result.filter_stats.before_count}건"
             )
+    elif payload.discovery_result:
+        summary.append(
+            f"- 탐색 결과: {len(payload.discovery_result.items)}건"
+        )
+        if payload.discovery_result.filter_stats:
+            summary.append(
+                f"- 반경/필터 적용 후: {payload.discovery_result.filter_stats.after_count}/{payload.discovery_result.filter_stats.before_count}건"
+            )
 
     if payload.search_result:
         summary.append(
@@ -113,6 +121,8 @@ def _build_table(payload: HybridReportPayload) -> List[str]:
         return _build_scan_table(payload.scan_result)
     if payload.listing_result:
         return _build_listing_table(payload.listing_result)
+    if payload.discovery_result:
+        return _build_listing_table(payload.discovery_result)
     if payload.complex_report:
         return _build_complex_summary_table(payload.complex_report)
     if payload.investment_indicator_result:
@@ -130,6 +140,8 @@ def _build_details(payload: HybridReportPayload) -> List[str]:
 
     if payload.listing_result:
         details.extend(_build_listing_details(payload.listing_result))
+    if payload.discovery_result:
+        details.extend(_build_listing_details(payload.discovery_result))
 
     if payload.search_result:
         details.extend(_build_search_details(payload.search_result))
