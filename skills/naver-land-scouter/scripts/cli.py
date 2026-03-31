@@ -557,7 +557,7 @@ def _build_output_notice(
     output_format: str,
 ) -> str:
     summary: Dict[str, Any] = {
-        "outputFile": str(Path(output_file).expanduser()),
+        "outputFile": Path(output_file).expanduser().as_posix(),
         "workflow": payload.workflow,
         "format": output_format,
     }

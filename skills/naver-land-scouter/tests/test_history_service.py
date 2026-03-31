@@ -14,10 +14,10 @@ class FakeHistoryRepository:
                     "hscpNo": "10364",
                     "ptpNo": "1",
                     "tradeTypeCode": "A1",
-                    "aptName": "구갈풍림(405-1)",
+                    "aptName": "예시풍림(405-1)",
                     "latitude": "37.275816",
                     "longitude": "127.111997",
-                    "sectionName": "구갈동",
+                    "sectionName": "예시동",
                 },
                 "articleAddition": {
                     "dealPrice": 33000,

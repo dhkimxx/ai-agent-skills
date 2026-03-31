@@ -11,7 +11,7 @@ class FakeListingRepository:
                 "articleList": [
                     {
                         "articleNo": "1",
-                        "articleName": "구성동테스트",
+                        "articleName": "예시동테스트",
                         "tradeType": "A1",
                         "realEstateType": "APT",
                         "dealPrice": "3억",
@@ -28,7 +28,7 @@ class FakeListingRepository:
                         "area1": 76.0,
                         "area2": 59.0,
                         "floorInfo": "3/15",
-                        "sectionName": "구성동",
+                        "sectionName": "예시동",
                         "lat": 37.2985,
                         "lon": 127.1053,
                     },
@@ -41,8 +41,8 @@ class FakeListingRepository:
         return (
             {
                 "complexNo": complex_no,
-                "address": "경기도 용인시 기흥구 구성동 123",
-                "sectionName": "구성동",
+                "address": "예시광역시 예시구 예시동 123",
+                "sectionName": "예시동",
                 "lat": 37.298958,
                 "lon": 127.105713,
             },
@@ -56,8 +56,8 @@ class NestedComplexDetailRepository(FakeListingRepository):
             {
                 "complexDetail": {
                     "complexNo": complex_no,
-                    "address": "경기도 용인시 기흥구 구갈동 456",
-                    "sectionName": "구갈동",
+                    "address": "예시광역시 예시구 예시동 456",
+                    "sectionName": "예시동",
                     "lat": 37.275816,
                     "lon": 127.111997,
                 }
@@ -84,8 +84,8 @@ class TestListingService(unittest.TestCase):
 
         self.assertEqual(len(result.items), 1)
         self.assertEqual(result.items[0].article_no, "1")
-        self.assertEqual(result.items[0].address, "경기도 용인시 기흥구 구성동 123")
-        self.assertEqual(result.items[0].dong_name, "구성동")
+        self.assertEqual(result.items[0].address, "예시광역시 예시구 예시동 123")
+        self.assertEqual(result.items[0].dong_name, "예시동")
         self.assertEqual(result.items[0].latitude, 37.298958)
         self.assertEqual(result.items[0].longitude, 127.105713)
         self.assertGreater(result.items[0].distance_meters or 0, 0)
@@ -107,8 +107,8 @@ class TestListingService(unittest.TestCase):
         )
 
         self.assertEqual(len(result.items), 2)
-        self.assertEqual(result.items[0].address, "경기도 용인시 기흥구 구갈동 456")
-        self.assertEqual(result.items[0].dong_name, "구갈동")
+        self.assertEqual(result.items[0].address, "예시광역시 예시구 예시동 456")
+        self.assertEqual(result.items[0].dong_name, "예시동")
         self.assertEqual(result.items[0].latitude, 37.275816)
         self.assertEqual(result.items[0].longitude, 127.111997)
 

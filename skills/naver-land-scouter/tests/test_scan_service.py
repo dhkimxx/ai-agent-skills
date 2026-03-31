@@ -7,10 +7,10 @@ from scripts.services.scan_service import ScanService
 class FakeScanRepository:
     def fetch_search(self, params):
         mapping = {
-            "기흥역": (37.275664, 127.115956),
-            "구성역": (37.299021, 127.105677),
+            "예시역A": (37.275664, 127.115956),
+            "예시역B": (37.299021, 127.105677),
         }
-        if params["keyword"] == "죽전역":
+        if params["keyword"] == "예시동역":
             return (
                 {
                     "regions": [
@@ -18,7 +18,7 @@ class FakeScanRepository:
                             "cortarNo": "2729011600",
                             "centerLat": 35.850204,
                             "centerLon": 128.538041,
-                            "cortarName": "대구광역시 달서구 죽전동",
+                            "cortarName": "예시광역시 예시구 예시동",
                             "cortarType": "sec",
                             "deepLink": "/complexes?ms=35.850204,128.538041,16&e=RETAIL",
                         }
@@ -48,7 +48,7 @@ class FakeScanRepository:
                 [
                     {
                         "markerId": "8107",
-                        "complexName": "상떼빌구성역플랫폼시티",
+                        "complexName": "예시역플랫폼시티",
                         "realEstateTypeCode": "APT",
                         "medianDealPrice": 32500,
                         "representativeArea": 81.0,
@@ -64,7 +64,7 @@ class FakeScanRepository:
                 [
                     {
                         "markerId": "10364",
-                        "complexName": "구갈풍림(405-1)",
+                        "complexName": "예시풍림(405-1)",
                         "realEstateTypeCode": "APT",
                         "medianDealPrice": 33000,
                         "representativeArea": 81.0,
@@ -82,7 +82,7 @@ class FakeScanRepository:
             article_list = [
                 {
                     "articleNo": "1",
-                    "articleName": "구갈풍림(405-1)",
+                    "articleName": "예시풍림(405-1)",
                     "tradeType": "A1",
                     "realEstateType": "APT",
                     "dealPrice": "3억 2,500",
@@ -96,7 +96,7 @@ class FakeScanRepository:
             article_list = [
                 {
                     "articleNo": "2",
-                    "articleName": "상떼빌구성역플랫폼시티",
+                    "articleName": "예시역플랫폼시티",
                     "tradeType": "A1",
                     "realEstateType": "APT",
                     "dealPrice": "3억 3,000",
@@ -113,14 +113,14 @@ class FakeScanRepository:
 
     def fetch_complex_detail(self, complex_no, params=None):
         if complex_no == "10364":
-            lat, lon, section_name = 37.275816, 127.111997, "구갈동"
+            lat, lon, section_name = 37.275816, 127.111997, "예시동"
         else:
-            lat, lon, section_name = 37.2992, 127.1089, "마북동"
+            lat, lon, section_name = 37.2992, 127.1089, "예시동"
         return (
             {
                 "complexDetail": {
                     "complexNo": complex_no,
-                    "address": "경기도 용인시 기흥구",
+                    "address": "예시광역시 예시구",
                     "sectionName": section_name,
                     "lat": lat,
                     "lon": lon,
@@ -135,7 +135,7 @@ class TestScanService(unittest.TestCase):
         service = ScanService(FakeScanRepository())
 
         result = service.scan_near_queries(
-            near_queries=["기흥역", "구성역"],
+            near_queries=["예시역A", "예시역B"],
             radius_meters=500,
             real_estate_type="APT",
             listing_input=ListingSearchInput(
@@ -156,7 +156,7 @@ class TestScanService(unittest.TestCase):
         service = ScanService(FakeScanRepository())
 
         result = service.scan_near_queries(
-            near_queries=["기흥역", "죽전역"],
+            near_queries=["예시역A", "예시동역"],
             radius_meters=500,
             real_estate_type="APT",
             listing_input=ListingSearchInput(

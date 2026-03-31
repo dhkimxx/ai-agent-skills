@@ -15,7 +15,7 @@ ARTICLE_NO = "2612380492"
 class FakeWorkflowRepository:
     def fetch_search(self, params):
         keyword = params["keyword"]
-        if keyword == "구성역":
+        if keyword == "예시역":
             return (
                 {
                     "deepLink": "/complexes?ms=37.299021,127.105677,16&e=RETAIL",
@@ -34,7 +34,7 @@ class FakeWorkflowRepository:
             [
                 {
                     "markerId": COMPLEX_NO,
-                    "complexName": "상떼빌구성역플랫폼시티",
+                    "complexName": "예시역플랫폼시티",
                     "realEstateTypeCode": "APT",
                     "medianDealPrice": ARTICLE_PRICE,
                     "representativeArea": ARTICLE_SUPPLY_AREA,
@@ -57,7 +57,7 @@ class FakeWorkflowRepository:
                 {
                     "articleNo": ARTICLE_NO,
                     "complexNo": complex_no,
-                    "articleName": "상떼빌구성역플랫폼시티",
+                    "articleName": "예시역플랫폼시티",
                     "tradeType": "A1",
                     "realEstateType": "APT",
                     "dealPrice": "3억 2,500",
@@ -77,8 +77,8 @@ class FakeWorkflowRepository:
             {
                 "complexDetail": {
                     "complexNo": complex_no,
-                    "address": "경기도 용인시 기흥구 마북동",
-                    "sectionName": "마북동",
+                    "address": "예시광역시 예시구 예시동",
+                    "sectionName": "예시동",
                     "lat": ARTICLE_LATITUDE,
                     "lon": ARTICLE_LONGITUDE,
                 }
@@ -92,12 +92,12 @@ class FakeWorkflowRepository:
                 "articleDetail": {
                     "articleNo": article_no,
                     "complexNo": COMPLEX_NO,
-                    "articleName": "상떼빌구성역플랫폼시티",
+                    "articleName": "예시역플랫폼시티",
                     "tradeType": "A1",
                     "realEstateType": "APT",
                     "dealOrWarrantPrc": ARTICLE_PRICE,
-                    "sectionName": "마북동",
-                    "exposureAddress": "경기도 용인시 기흥구 마북동",
+                    "sectionName": "예시동",
+                    "exposureAddress": "예시광역시 예시구 예시동",
                     "latitude": ARTICLE_LATITUDE,
                     "longitude": ARTICLE_LONGITUDE,
                     "areaNo": "1",
@@ -136,7 +136,7 @@ class TestWorkflowService(unittest.TestCase):
         service = WorkflowService(FakeWorkflowRepository())
 
         result = service.run_listing_workflow(
-            near_queries=["구성역"],
+            near_queries=["예시역"],
             radius_meters=500,
             fallback_radius_meters=[700, 1000],
             real_estate_type="APT",
@@ -164,7 +164,7 @@ class TestWorkflowService(unittest.TestCase):
         service = WorkflowService(FakeWorkflowRepository())
 
         result = service.run_listing_workflow(
-            near_queries=["구성역"],
+            near_queries=["예시역"],
             radius_meters=700,
             fallback_radius_meters=[],
             real_estate_type="APT",
@@ -188,7 +188,7 @@ class TestWorkflowService(unittest.TestCase):
         service = WorkflowService(FakeWorkflowRepository())
 
         result = service.run_listing_workflow(
-            near_queries=["구성역"],
+            near_queries=["예시역"],
             radius_meters=700,
             fallback_radius_meters=[],
             real_estate_type="APT",
@@ -212,7 +212,7 @@ class TestWorkflowService(unittest.TestCase):
         service = WorkflowService(FakeWorkflowRepository())
 
         result = service.run_listing_workflow(
-            near_queries=["구성역"],
+            near_queries=["예시역"],
             radius_meters=700,
             fallback_radius_meters=[],
             real_estate_type="APT",
@@ -238,7 +238,7 @@ class TestWorkflowService(unittest.TestCase):
         service = WorkflowService(FakeWorkflowRepository())
 
         result = service.run_listing_workflow(
-            near_queries=["구성역"],
+            near_queries=["예시역"],
             radius_meters=500,
             fallback_radius_meters=[700],
             real_estate_type="APT",
