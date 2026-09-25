@@ -11,6 +11,7 @@ Vendor-neutral skill repository for Codex, Claude, and Antigravity.
 | [go-gorm-persistence](skills/go-gorm-persistence) | Go backend persistence patterns for GORM repositories, scopes, pagination, transactions, migrations, and DB tests | `npx skills add dhkimxx/ai-agent-skills --skill go-gorm-persistence` |
 | [meta-docs](skills/meta-docs) | Frontmatter-first docs management (search/read/update/create) | `npx skills add dhkimxx/ai-agent-skills --skill meta-docs` |
 | [naver-land-scouter](skills/naver-land-scouter) | Naver Land listings/complex analysis & reporting | `npx skills add dhkimxx/ai-agent-skills --skill naver-land-scouter` |
+| [korean-tech-writing](skills/korean-tech-writing) | 한국어 기술문서 작성 — 문서 유형별 템플릿, 용어 풀이 패턴, 문체·표기 규칙, 발행 체크리스트 | `npx skills add dhkimxx/ai-agent-skills --skill korean-tech-writing` |
 
 ## Validate
 
